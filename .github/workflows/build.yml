@@ -15,7 +15,7 @@ jobs:
 
       - name: Extract project
         run: |
-          unzip -q GolYar_GitHubReady_v18.1.zip
+          unzip -q GolYar_GitHubReady_v18.2.zip
           cd GolYar_GitHub
           echo "PROJECT_DIR=$PWD" >> $GITHUB_ENV
 
