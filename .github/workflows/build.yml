@@ -15,7 +15,7 @@ jobs:
 
       - name: Extract project
         run: |
-          unzip -q GolYar_GitHubReady_v19.4_Firebase.zip
+          unzip -q GolYar_GitHubReady_v19.5_Firebase.zip
           cd GolYar_GitHub
           echo "PROJECT_DIR=$PWD" >> $GITHUB_ENV
 
