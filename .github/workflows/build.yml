@@ -24,7 +24,7 @@ jobs:
 
       - name: Extract GolYar v22.0
         run: |
-          unzip -q GolYar_GitHubReady_v22.0_FIXED.zip -d golyar_project
+          unzip -q GolYar_GitHubReady_v22.0_FIXED2.zip -d golyar_project
 
       - name: Find Gradle project
         run: |
