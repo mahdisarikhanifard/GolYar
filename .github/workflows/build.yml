@@ -22,26 +22,30 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Extract GolYar v22.0
-        run: |
-          unzip -q GolYar_GitHubReady_v22.2_COMPLETE.zip -d golyar_project
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
 
-      - name: Find Gradle project
+      - name: Verify project structure
         run: |
-          find golyar_project -maxdepth 4 \
-            \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
-            -print
+          echo "=== Project files ==="
+          find . -maxdepth 3 -type f | sort
+          echo "=== Gradle files ==="
+          find . -name "build.gradle*" -o -name "settings.gradle*"
 
-      - name: Build debug APK
+      - name: Build Debug APK
         run: |
-          PROJECT_DIR=$(dirname "$(find golyar_project -type f \( -name 'settings.gradle' -o -name 'settings.gradle.kts' \) | head -n 1)")
-          echo "Project directory: $PROJECT_DIR"
-          cd "$PROJECT_DIR"
-          gradle --no-daemon assembleDebug
+          gradle --no-daemon --stacktrace assembleDebug
+
+      - name: Verify APK
+        run: |
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolYar-v22.0-debug-apk
-          path: golyar_project/**/app/build/outputs/apk/debug/app-debug.apk
+          name: GolYar-v23.0-Professional-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
