@@ -18,7 +18,7 @@ jobs:
 
       - name: Check exact GolYar ZIP
         run: |
-          ZIP_FILE="GolYar_GitHubReady_v23.1_Professional.zip"
+          ZIP_FILE="GolYar_GitHubReady_v23.2_SyncFix.zip"
 
           if [ ! -f "$ZIP_FILE" ]; then
             echo "ERROR: Exact ZIP file not found:"
@@ -34,7 +34,7 @@ jobs:
 
       - name: Extract exact project
         run: |
-          ZIP_FILE="GolYar_GitHubReady_v23.1_Professional.zip"
+          ZIP_FILE="GolYar_GitHubReady_v23.2_SyncFix.zip"
 
           rm -rf project
           mkdir -p project
@@ -73,7 +73,7 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Build v23.1 Debug APK
+      - name: Build v23.2 SyncFix Debug APK
         run: |
           cd "$PROJECT_DIR"
 
@@ -98,9 +98,9 @@ jobs:
           echo "APK path:"
           echo "$APK"
 
-      - name: Upload v23.1 APK
+      - name: Upload v23.2 SyncFix APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolYar-v23.1-Professional-debug-apk
+          name: GolYar-v23.2-SyncFix-debug-apk
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
