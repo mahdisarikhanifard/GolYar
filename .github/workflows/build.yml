@@ -25,118 +25,126 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Detect project
+      - name: Locate Gol Negar project
         shell: bash
         run: |
-          echo "======================================"
-          echo "Detecting Gol Negar project"
-          echo "======================================"
+          set -euo pipefail
 
-          echo "Repository files:"
-          find . -maxdepth 3 -type f | sort
+          echo "========================================"
+          echo "GOL NEGAR V25 BUILD WORKFLOW"
+          echo "========================================"
 
-          if [ -f "settings.gradle.kts" ] || [ -f "settings.gradle" ]; then
-            echo "PROJECT_MODE=ROOT" >> "$GITHUB_ENV"
-            echo "BUILD_DIR=." >> "$GITHUB_ENV"
+          echo "Repository contents:"
+          find . -maxdepth 2 -type f | sort
+
+          # حالت 1: پروژه مستقیماً در ریشه Repository است
+          if [ -f "settings.gradle.kts" ] && [ -f "app/build.gradle.kts" ]; then
             echo "Gradle project found in repository root."
-
-          else
-            ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -1)
-
-            if [ -z "$ZIP_FILE" ]; then
-              echo "ERROR: No Gradle project or ZIP file found."
-              exit 1
-            fi
-
-            echo "ZIP found:"
-            echo "$ZIP_FILE"
-
-            rm -rf build_source
-            mkdir -p build_source
-
-            unzip -q "$ZIP_FILE" -d build_source
-
-            echo "Extracted files:"
-            find build_source -maxdepth 5 -type f | sort
-
-            SETTINGS_FILE=$(find build_source \
-              -type f \
-              \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
-              | head -1)
-
-            if [ -z "$SETTINGS_FILE" ]; then
-              echo "ERROR: settings.gradle or settings.gradle.kts not found."
-              exit 1
-            fi
-
-            BUILD_DIR=$(dirname "$SETTINGS_FILE")
-
-            echo "Gradle project found at:"
-            echo "$BUILD_DIR"
-
-            echo "PROJECT_MODE=ZIP" >> "$GITHUB_ENV"
-            echo "BUILD_DIR=$BUILD_DIR" >> "$GITHUB_ENV"
+            echo "PROJECT_DIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+            exit 0
           fi
 
-      - name: Verify Gradle project
-        shell: bash
-        run: |
-          echo "======================================"
-          echo "Gradle project verification"
-          echo "======================================"
+          # حالت 2: پروژه به صورت ZIP در Repository آپلود شده
+          ZIP_FILE=$(find . -maxdepth 2 -type f \
+            -name 'GolNegar_GitHubReady_v*.zip' \
+            | sort \
+            | tail -n 1)
 
-          echo "Build directory:"
-          echo "$BUILD_DIR"
+          # اگر ZIP با نام GolNegar پیدا نشد، هر ZIP پروژه را امتحان کن
+          if [ -z "$ZIP_FILE" ]; then
+            ZIP_FILE=$(find . -maxdepth 2 -type f \
+              -name '*.zip' \
+              | sort \
+              | tail -n 1)
+          fi
 
-          if [ ! -f "$BUILD_DIR/settings.gradle.kts" ] && \
-             [ ! -f "$BUILD_DIR/settings.gradle" ]; then
-            echo "ERROR: Gradle settings file not found."
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: No Gradle project or ZIP file found."
             exit 1
           fi
 
-          if [ ! -f "$BUILD_DIR/build.gradle.kts" ] && \
-             [ ! -f "$BUILD_DIR/build.gradle" ]; then
-            echo "ERROR: Root Gradle build file not found."
+          echo "Selected project ZIP:"
+          echo "$ZIP_FILE"
+
+          rm -rf build_source
+          mkdir -p build_source
+
+          unzip -q "$ZIP_FILE" -d build_source
+
+          echo "Extracted project:"
+          find build_source -maxdepth 5 -type f | sort
+
+          SETTINGS_FILE=$(find build_source \
+            -type f \
+            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
+            | head -n 1)
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ERROR: settings.gradle.kts was not found."
             exit 1
           fi
 
-          echo "Gradle project is valid."
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
 
-          find "$BUILD_DIR" -maxdepth 3 -type f | sort
+          if [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
+            echo "ERROR: Android app Gradle file was not found."
+            exit 1
+          fi
 
-      - name: Build Gol Negar
+          echo "========================================"
+          echo "Gradle project:"
+          echo "$PROJECT_DIR"
+          echo "========================================"
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Verify V25 project
         shell: bash
         run: |
-          echo "======================================"
-          echo "Building Gol Negar v25.0"
-          echo "======================================"
+          set -euo pipefail
 
-          cd "$BUILD_DIR"
+          echo "Checking project..."
 
-          gradle clean assembleDebug --no-daemon
+          test -f "$PROJECT_DIR/settings.gradle.kts"
+          test -f "$PROJECT_DIR/build.gradle.kts"
+          test -f "$PROJECT_DIR/app/build.gradle.kts"
+
+          echo "Project verification PASSED."
+
+      - name: Build Gol Negar V25
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "BUILDING GOL NEGAR V25.0"
+          echo "========================================"
+
+          cd "$PROJECT_DIR"
+
+          gradle clean assembleDebug \
+            --no-daemon \
+            --stacktrace
 
       - name: Find APK
         shell: bash
         run: |
-          echo "======================================"
-          echo "Searching for APK"
-          echo "======================================"
+          set -euo pipefail
 
-          find "$BUILD_DIR" \
+          echo "Searching for APK..."
+
+          find "$PROJECT_DIR" \
             -type f \
             -name "*.apk" \
             -print
 
-      - name: Prepare APK
-        shell: bash
-        run: |
-          APK=$(find "$BUILD_DIR" \
+          APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" \
             -type f \
             -name "*.apk" \
-            | head -1)
+            | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK was not created!"
+            echo "ERROR: APK was not created."
             exit 1
           fi
 
@@ -145,11 +153,11 @@ jobs:
           cp "$APK" \
             "release/GolNegar-v25.0-debug.apk"
 
-          echo "======================================"
-          echo "Gol Negar v25.0 APK CREATED"
-          echo "======================================"
+          echo "========================================"
+          echo "APK CREATED SUCCESSFULLY"
+          echo "========================================"
 
-          ls -lh release/
+          ls -lh release/GolNegar-v25.0-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
