@@ -20,7 +20,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Setup Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
@@ -30,7 +30,7 @@ jobs:
           ZIP_FILE="GolYar_GitHubReady_v24.1_SellerAutoLogin.zip"
 
           if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: v24.1 ZIP not found"
+            echo "ERROR: v24.1 ZIP not found!"
             exit 1
           fi
 
@@ -40,66 +40,38 @@ jobs:
       - name: Extract v24.1
         run: |
           rm -rf build_source
-          mkdir build_source
+          mkdir -p build_source
 
           unzip -q \
             "GolYar_GitHubReady_v24.1_SellerAutoLogin.zip" \
             -d build_source
 
-          echo "===== EXTRACTED FILES ====="
-          find build_source -maxdepth 4 -type f | sort
+          echo "===== PROJECT FILES ====="
+          find build_source/v24 -maxdepth 3 -type f | sort
 
-      - name: Find Gradle project
+      - name: Build v24.1 APK
+        working-directory: build_source/v24
         run: |
-          echo "===== SEARCHING FOR GRADLEW ====="
-
-          GRADLEW=$(find build_source \
-            -type f \
-            -name gradlew \
-            | head -1)
-
-          if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew was not found"
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$GRADLEW")
-
-          echo "GRADLEW FOUND:"
-          echo "$GRADLEW"
-
-          echo "PROJECT DIRECTORY:"
-          echo "$PROJECT_DIR"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-      - name: Make Gradle executable
-        run: |
-          chmod +x "$PROJECT_DIR/gradlew"
-
-      - name: Build APK
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          ./gradlew clean assembleDebug --no-daemon
+          gradle clean assembleDebug --no-daemon
 
       - name: Find APK
         run: |
-          echo "===== APK FILES ====="
+          echo "===== APK ====="
 
-          find "$PROJECT_DIR" \
+          find build_source/v24 \
             -type f \
             -name "*.apk" \
             -print
 
       - name: Prepare APK
         run: |
-          APK=$(find "$PROJECT_DIR" \
+          APK=$(find build_source/v24 \
             -type f \
             -name "*.apk" \
             | head -1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK was not created"
+            echo "ERROR: APK was not created!"
             exit 1
           fi
 
