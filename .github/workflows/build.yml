@@ -25,75 +25,81 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Verify v24.1 source ZIP
+      - name: Check v24.1 ZIP
         run: |
           ZIP_FILE="GolYar_GitHubReady_v24.1_SellerAutoLogin.zip"
 
           if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: $ZIP_FILE not found!"
-            echo "Repository files:"
-            find . -maxdepth 2 -type f | sort
+            echo "ERROR: v24.1 ZIP not found"
             exit 1
           fi
 
-          echo "Found: $ZIP_FILE"
+          echo "ZIP FOUND:"
+          ls -lh "$ZIP_FILE"
 
       - name: Extract v24.1
         run: |
-          ZIP_FILE="GolYar_GitHubReady_v24.1_SellerAutoLogin.zip"
-
           rm -rf build_source
-          mkdir -p build_source
+          mkdir build_source
 
-          unzip -q "$ZIP_FILE" -d build_source
+          unzip -q \
+            "GolYar_GitHubReady_v24.1_SellerAutoLogin.zip" \
+            -d build_source
 
-          echo "Extracted source:"
-          find build_source -maxdepth 3 -type f | sort | head -200
+          echo "===== EXTRACTED FILES ====="
+          find build_source -maxdepth 4 -type f | sort
 
-      - name: Locate Android project
+      - name: Find Gradle project
         run: |
-          if [ -f "build_source/settings.gradle" ] || \
-             [ -f "build_source/settings.gradle.kts" ] || \
-             [ -f "build_source/gradlew" ]; then
-            echo "PROJECT_DIR=build_source" >> "$GITHUB_ENV"
-          else
-            PROJECT_DIR=$(find build_source -name settings.gradle -o -name settings.gradle.kts | head -1 | xargs dirname)
+          echo "===== SEARCHING FOR GRADLEW ====="
 
-            if [ -z "$PROJECT_DIR" ]; then
-              echo "ERROR: Android project not found!"
-              exit 1
-            fi
+          GRADLEW=$(find build_source \
+            -type f \
+            -name gradlew \
+            | head -1)
 
-            echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: gradlew was not found"
+            exit 1
           fi
+
+          PROJECT_DIR=$(dirname "$GRADLEW")
+
+          echo "GRADLEW FOUND:"
+          echo "$GRADLEW"
+
+          echo "PROJECT DIRECTORY:"
+          echo "$PROJECT_DIR"
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Make Gradle executable
         run: |
           chmod +x "$PROJECT_DIR/gradlew"
 
-      - name: Build v24.1 Debug APK
+      - name: Build APK
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           ./gradlew clean assembleDebug --no-daemon
 
       - name: Find APK
         run: |
-          echo "Searching for APK..."
+          echo "===== APK FILES ====="
 
           find "$PROJECT_DIR" \
             -type f \
             -name "*.apk" \
             -print
 
-      - name: Rename APK
+      - name: Prepare APK
         run: |
           APK=$(find "$PROJECT_DIR" \
             -type f \
-            -path "*/build/outputs/apk/*/*.apk" \
+            -name "*.apk" \
             | head -1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK was not created!"
+            echo "ERROR: APK was not created"
             exit 1
           fi
 
