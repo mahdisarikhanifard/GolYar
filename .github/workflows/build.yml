@@ -3,53 +3,109 @@ name: Build GolYar APK
 on:
   workflow_dispatch:
   push:
-    branches: ["main"]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
 
     steps:
-      - name: Checkout
+
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check exact GolYar ZIP
+      - name: Show repository files
         run: |
-          ZIP_FILE="GolYar_GitHubReady_v23.4_SalesSettlementSyncFix.zip"
+          echo "Repository:"
+          pwd
+          echo ""
+          echo "Root files:"
+          find . -maxdepth 2 -type f | sort
+
+      - name: Verify v24.0 package
+        run: |
+          set -euo pipefail
+
+          ZIP_FILE="GolYar_GitHubReady_v24.0_CompleteFix.zip"
+
+          echo "Required package:"
+          echo "$ZIP_FILE"
 
           if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: Exact ZIP file not found: $ZIP_FILE"
-            find . -maxdepth 1 -type f -name "*.zip" -print
+            echo ""
+            echo "ERROR: v24.0 package was NOT found."
+            echo ""
+            echo "Available GolYar ZIP files:"
+            find . -maxdepth 1 -type f -name "GolYar_GitHubReady_*.zip" -print
             exit 1
           fi
 
+          echo ""
+          echo "v24.0 package FOUND:"
           ls -lh "$ZIP_FILE"
 
-      - name: Extract exact project
+          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
+
+      - name: Extract v24.0 package
         run: |
-          ZIP_FILE="GolYar_GitHubReady_v23.4_SalesSettlementSyncFix.zip"
+          set -euo pipefail
 
           rm -rf project
           mkdir -p project
+
           unzip -q "$ZIP_FILE" -d project
+
+          echo "Extracted files:"
+          find project -maxdepth 3 -type f | sort
 
       - name: Locate Gradle project
         run: |
-          SETTINGS=$(find project \( -name "settings.gradle.kts" -o -name "settings.gradle" \) -type f | head -n 1)
+          set -euo pipefail
+
+          SETTINGS=$(find project -type f \
+            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
+            | head -n 1)
 
           if [ -z "$SETTINGS" ]; then
-            echo "ERROR: Gradle settings file not found."
+            echo "ERROR: settings.gradle(.kts) not found."
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS")
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Gradle project: $PROJECT_DIR"
+
+          echo "Gradle project:"
+          echo "$PROJECT_DIR"
+
+      - name: Verify v24.0 source
+        run: |
+          set -euo pipefail
+
+          echo "Checking MainActivity.kt..."
+
+          MAIN="$PROJECT_DIR/app/src/main/java/com/example/golyar/MainActivity.kt"
+
+          if [ ! -f "$MAIN" ]; then
+            echo "ERROR: MainActivity.kt not found."
+            exit 1
+          fi
+
+          echo "MainActivity found:"
+          ls -lh "$MAIN"
+
+          echo ""
+          echo "Checking app version..."
+
+          grep -n "versionCode\|versionName" \
+            "$PROJECT_DIR/app/build.gradle.kts" || true
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -59,25 +115,48 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Build v23.4 SalesSettlementSyncFix Debug APK
+      - name: Build GolYar v24.0
         run: |
-          cd "$PROJECT_DIR"
-          gradle --no-daemon --stacktrace assembleDebug
+          set -euo pipefail
 
-      - name: Verify APK
+          cd "$PROJECT_DIR"
+
+          echo "Building GolYar v24.0..."
+
+          gradle \
+            --no-daemon \
+            --stacktrace \
+            assembleDebug
+
+      - name: Verify generated APK
         run: |
-          APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" -type f -name "*.apk" | head -n 1)
+          set -euo pipefail
+
+          APK_DIR="$PROJECT_DIR/app/build/outputs/apk/debug"
+
+          APK=$(find "$APK_DIR" \
+            -type f \
+            -name "*.apk" \
+            | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK not found."
+            echo "ERROR: APK was not generated."
             exit 1
           fi
 
+          echo ""
+          echo "======================================"
+          echo "GolYar v24.0 APK CREATED SUCCESSFULLY"
+          echo "======================================"
+          echo ""
+          echo "APK:"
+          echo "$APK"
+          echo ""
           ls -lh "$APK"
 
-      - name: Upload v23.4 APK
+      - name: Upload GolYar v24.0 APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolYar-v23.4-SalesSettlementSyncFix-debug-apk
+          name: GolYar-v24.0-CompleteFix-debug-apk
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
