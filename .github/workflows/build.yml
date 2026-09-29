@@ -8,7 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
 
@@ -18,37 +17,27 @@ jobs:
 
       - name: Check exact GolYar ZIP
         run: |
-          ZIP_FILE="GolYar_GitHubReady_v23.3_StorageSessionFix.zip"
+          ZIP_FILE="GolYar_GitHubReady_v23.4_SalesSettlementSyncFix.zip"
 
           if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: Exact ZIP file not found:"
-            echo "$ZIP_FILE"
-            echo ""
-            echo "Available ZIP files:"
+            echo "ERROR: Exact ZIP file not found: $ZIP_FILE"
             find . -maxdepth 1 -type f -name "*.zip" -print
             exit 1
           fi
 
-          echo "Using exact ZIP:"
           ls -lh "$ZIP_FILE"
 
       - name: Extract exact project
         run: |
-          ZIP_FILE="GolYar_GitHubReady_v23.3_StorageSessionFix.zip"
+          ZIP_FILE="GolYar_GitHubReady_v23.4_SalesSettlementSyncFix.zip"
 
           rm -rf project
           mkdir -p project
-
           unzip -q "$ZIP_FILE" -d project
-
-          echo "=== Extracted project ==="
-          find project -maxdepth 4 -type f | sort
 
       - name: Locate Gradle project
         run: |
-          SETTINGS=$(find project \
-            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
-            -type f | head -n 1)
+          SETTINGS=$(find project \( -name "settings.gradle.kts" -o -name "settings.gradle" \) -type f | head -n 1)
 
           if [ -z "$SETTINGS" ]; then
             echo "ERROR: Gradle settings file not found."
@@ -56,11 +45,8 @@ jobs:
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS")
-
-          echo "Gradle project:"
-          echo "$PROJECT_DIR"
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Gradle project: $PROJECT_DIR"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -73,34 +59,25 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Build v23.3 StorageSessionFix Debug APK
+      - name: Build v23.4 SalesSettlementSyncFix Debug APK
         run: |
           cd "$PROJECT_DIR"
-
-          echo "Building project:"
-          pwd
-
           gradle --no-daemon --stacktrace assembleDebug
 
       - name: Verify APK
         run: |
-          APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" \
-            -type f -name "*.apk" | head -n 1)
+          APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" -type f -name "*.apk" | head -n 1)
 
           if [ -z "$APK" ]; then
             echo "ERROR: APK not found."
             exit 1
           fi
 
-          echo "=== APK FOUND ==="
           ls -lh "$APK"
-          echo ""
-          echo "APK path:"
-          echo "$APK"
 
-      - name: Upload v23.3 StorageSessionFix APK
+      - name: Upload v23.4 APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolYar-v23.3-StorageSessionFix-debug-apk
+          name: GolYar-v23.4-SalesSettlementSyncFix-debug-apk
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
