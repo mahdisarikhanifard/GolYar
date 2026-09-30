@@ -34,22 +34,33 @@ jobs:
           echo "       GOL NEGAR V25.17 BUILD"
           echo "========================================"
 
-          # اگر پروژه مستقیماً در ریشه Repository باشد
+          # حالت اول:
+          # پروژه مستقیماً در ریشه Repository است.
           if [ -f "settings.gradle.kts" ] && [ -f "app/build.gradle.kts" ]; then
+
             echo "Gradle project found in repository root."
+
             PROJECT_DIR="$GITHUB_WORKSPACE"
+
           else
-            # فقط نسخه 25.17 مجاز است
+
+            # حالت دوم:
+            # پروژه داخل ZIP نسخه 25.17 است.
             ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.17_SellerPassword.zip"
 
             if [ ! -f "$ZIP_FILE" ]; then
+
               echo "ERROR: V25.17 ZIP was not found."
               echo ""
               echo "Expected:"
               echo "$ZIP_FILE"
               echo ""
               echo "Files found in repository:"
-              find "$GITHUB_WORKSPACE" -maxdepth 2 -type f | sort
+              find "$GITHUB_WORKSPACE" \
+                -maxdepth 2 \
+                -type f \
+                | sort
+
               exit 1
             fi
 
@@ -59,6 +70,7 @@ jobs:
             echo "========================================"
 
             rm -rf "$GITHUB_WORKSPACE/build_source"
+
             mkdir -p "$GITHUB_WORKSPACE/build_source"
 
             unzip -q "$ZIP_FILE" \
@@ -67,15 +79,23 @@ jobs:
             SETTINGS_FILE=$(find \
               "$GITHUB_WORKSPACE/build_source" \
               -type f \
-              \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
+              \( \
+                -name "settings.gradle.kts" \
+                -o \
+                -name "settings.gradle" \
+              \) \
               | head -n 1)
 
             if [ -z "$SETTINGS_FILE" ]; then
+
               echo "ERROR: settings.gradle.kts was not found."
+
               exit 1
+
             fi
 
             PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
@@ -92,7 +112,9 @@ jobs:
 
           cd "$PROJECT_DIR"
 
+          echo "========================================"
           echo "Checking Gradle project..."
+          echo "========================================"
 
           test -f "settings.gradle.kts"
           test -f "build.gradle.kts"
@@ -104,7 +126,9 @@ jobs:
           echo "Gradle project files: OK"
 
           echo ""
+          echo "========================================"
           echo "Checking application version..."
+          echo "========================================"
 
           grep -n "versionCode" \
             app/build.gradle.kts || true
@@ -112,37 +136,43 @@ jobs:
           grep -n "versionName" \
             app/build.gradle.kts || true
 
+          # فقط versionName بررسی می‌شود.
+          # versionCode ممکن است بین نسخه‌ها تغییر کند
+          # و نباید باعث توقف Build شود.
+
           if ! grep -q 'versionName = "25.17"' \
             app/build.gradle.kts; then
+
             echo ""
             echo "ERROR: Source is NOT V25.17."
             echo "Build stopped intentionally."
-            exit 1
-          fi
 
-          if ! grep -q 'versionCode = 27' \
-            app/build.gradle.kts; then
-            echo ""
-            echo "ERROR: Expected versionCode 27."
-            echo "Build stopped intentionally."
             exit 1
           fi
 
           echo ""
-          echo "Checking seller password code..."
+          echo "V25.17 source verification: PASSED"
 
-          if ! grep -q "رمز عبور" \
+          echo ""
+          echo "========================================"
+          echo "Checking seller password feature..."
+          echo "========================================"
+
+          if grep -q "رمز عبور" \
             app/src/main/java/com/example/golyar/MainActivity.kt; then
-            echo ""
-            echo "WARNING: Seller password text was not found."
-            echo "Continuing because source version is correct."
+
+            echo "Seller password feature: FOUND"
+
           else
-            echo "Seller password code: FOUND"
+
+            echo "WARNING:"
+            echo "Seller password text was not found."
+
           fi
 
           echo ""
           echo "========================================"
-          echo "     V25.17 SOURCE VERIFICATION PASSED"
+          echo "SOURCE VERIFICATION PASSED"
           echo "========================================"
 
       - name: Build Gol Negar V25.17
@@ -181,9 +211,12 @@ jobs:
             | head -n 1)
 
           if [ -z "$APK" ]; then
+
             echo ""
             echo "ERROR: APK was not created."
+
             exit 1
+
           fi
 
           mkdir -p release
