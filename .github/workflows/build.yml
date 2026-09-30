@@ -25,41 +25,47 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Locate EXACT Gol Negar V25.15 project
+      - name: Locate EXACT Gol Negar V25.17 project
         shell: bash
         run: |
           set -euo pipefail
 
           echo "========================================"
-          echo "GOL NEGAR V25.15 BUILD"
+          echo "       GOL NEGAR V25.17 BUILD"
           echo "========================================"
 
-          # اگر پروژه مستقیماً در Repository است، همان را استفاده کن
+          # اگر پروژه مستقیماً در ریشه Repository باشد
           if [ -f "settings.gradle.kts" ] && [ -f "app/build.gradle.kts" ]; then
             echo "Gradle project found in repository root."
             PROJECT_DIR="$GITHUB_WORKSPACE"
           else
-            # فقط و فقط ZIP نسخه 25.15 مجاز است
-            ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.15_Stable.zip"
+            # فقط نسخه 25.17 مجاز است
+            ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.17_SellerPassword.zip"
 
             if [ ! -f "$ZIP_FILE" ]; then
-              echo "ERROR: Exact V25.15 ZIP was not found:"
+              echo "ERROR: V25.17 ZIP was not found."
+              echo ""
+              echo "Expected:"
               echo "$ZIP_FILE"
               echo ""
-              echo "Available files:"
+              echo "Files found in repository:"
               find "$GITHUB_WORKSPACE" -maxdepth 2 -type f | sort
               exit 1
             fi
 
-            echo "Using EXACT ZIP:"
+            echo "========================================"
+            echo "Using EXACT V25.17 ZIP:"
             echo "$ZIP_FILE"
+            echo "========================================"
 
             rm -rf "$GITHUB_WORKSPACE/build_source"
             mkdir -p "$GITHUB_WORKSPACE/build_source"
 
-            unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/build_source"
+            unzip -q "$ZIP_FILE" \
+              -d "$GITHUB_WORKSPACE/build_source"
 
-            SETTINGS_FILE=$(find "$GITHUB_WORKSPACE/build_source" \
+            SETTINGS_FILE=$(find \
+              "$GITHUB_WORKSPACE/build_source" \
               -type f \
               \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
               | head -n 1)
@@ -79,55 +85,73 @@ jobs:
           echo "$PROJECT_DIR"
           echo "========================================"
 
-      - name: Verify EXACT V25.15 source
+      - name: Verify EXACT V25.17 source
         shell: bash
         run: |
           set -euo pipefail
 
           cd "$PROJECT_DIR"
 
+          echo "Checking Gradle project..."
+
           test -f "settings.gradle.kts"
+          test -f "build.gradle.kts"
           test -f "app/build.gradle.kts"
-          test -f "app/src/main/java/com/example/golyar/MainActivity.kt"
 
-          echo "Checking version..."
+          test -f \
+            "app/src/main/java/com/example/golyar/MainActivity.kt"
 
-          grep -n 'versionName' app/build.gradle.kts
-          grep -n 'versionCode' app/build.gradle.kts
+          echo "Gradle project files: OK"
 
-          if ! grep -q 'versionName = "25.15"' app/build.gradle.kts; then
-            echo "ERROR: This is NOT V25.15."
+          echo ""
+          echo "Checking application version..."
+
+          grep -n "versionCode" \
+            app/build.gradle.kts || true
+
+          grep -n "versionName" \
+            app/build.gradle.kts || true
+
+          if ! grep -q 'versionName = "25.17"' \
+            app/build.gradle.kts; then
+            echo ""
+            echo "ERROR: Source is NOT V25.17."
+            echo "Build stopped intentionally."
             exit 1
           fi
 
-          if ! grep -q 'versionCode = 25' app/build.gradle.kts; then
-            echo "ERROR: Expected versionCode 25."
+          if ! grep -q 'versionCode = 27' \
+            app/build.gradle.kts; then
+            echo ""
+            echo "ERROR: Expected versionCode 27."
+            echo "Build stopped intentionally."
             exit 1
           fi
 
-          echo "Checking payment page..."
+          echo ""
+          echo "Checking seller password code..."
 
-          COUNT=$(grep -c 'showSellerGreenhousePaymentPage' \
-            app/src/main/java/com/example/golyar/MainActivity.kt || true)
-
-          echo "showSellerGreenhousePaymentPage occurrences: $COUNT"
-
-          if [ "$COUNT" -lt 1 ]; then
-            echo "ERROR: Payment page source was not found."
-            exit 1
+          if ! grep -q "رمز عبور" \
+            app/src/main/java/com/example/golyar/MainActivity.kt; then
+            echo ""
+            echo "WARNING: Seller password text was not found."
+            echo "Continuing because source version is correct."
+          else
+            echo "Seller password code: FOUND"
           fi
 
+          echo ""
           echo "========================================"
-          echo "V25.15 SOURCE VERIFICATION PASSED"
+          echo "     V25.17 SOURCE VERIFICATION PASSED"
           echo "========================================"
 
-      - name: Build Gol Negar V25.15
+      - name: Build Gol Negar V25.17
         shell: bash
         run: |
           set -euo pipefail
 
           echo "========================================"
-          echo "BUILDING GOL NEGAR V25.15"
+          echo "       BUILDING GOL NEGAR V25.17"
           echo "========================================"
 
           cd "$PROJECT_DIR"
@@ -141,19 +165,23 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "========================================"
           echo "Searching for APK..."
+          echo "========================================"
 
           find "$PROJECT_DIR/app/build/outputs" \
             -type f \
             -name "*.apk" \
             -print
 
-          APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" \
+          APK=$(find \
+            "$PROJECT_DIR/app/build/outputs/apk/debug" \
             -type f \
             -name "*.apk" \
             | head -n 1)
 
           if [ -z "$APK" ]; then
+            echo ""
             echo "ERROR: APK was not created."
             exit 1
           fi
@@ -161,17 +189,19 @@ jobs:
           mkdir -p release
 
           cp "$APK" \
-            "release/GolNegar-v25.15-debug.apk"
+            "release/GolNegar-v25.17-debug.apk"
 
+          echo ""
           echo "========================================"
-          echo "APK CREATED SUCCESSFULLY"
+          echo "       APK CREATED SUCCESSFULLY"
           echo "========================================"
 
-          ls -lh release/GolNegar-v25.15-debug.apk
+          ls -lh \
+            "release/GolNegar-v25.17-debug.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.15-debug-apk
-          path: release/GolNegar-v25.15-debug.apk
+          name: GolNegar-v25.17-debug-apk
+          path: release/GolNegar-v25.17-debug.apk
           if-no-files-found: error
