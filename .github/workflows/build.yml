@@ -13,7 +13,7 @@ jobs:
     steps:
 
       # ─────────────────────────────────────
-      # Checkout repository
+      # Checkout
       # ─────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
 
 
       # ─────────────────────────────────────
-      # Gradle
+      # Gradle 8.11.1
       # ─────────────────────────────────────
       - name: Setup Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
@@ -39,27 +39,32 @@ jobs:
 
 
       # ─────────────────────────────────────
-      # Locate EXACT Gol Negar V25.18 source
+      # Locate EXACT Gol Negar V25.21 source
       # ─────────────────────────────────────
-      - name: Locate EXACT Gol Negar V25.18 project
+      - name: Locate EXACT Gol Negar V25.21 project
         shell: bash
         run: |
           set -euo pipefail
 
-          ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.18_FirebaseConnectFix.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.21_GreenhouseLoginFix.zip"
 
           echo "Looking for:"
           echo "$ZIP_FILE"
 
           if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: V25.18 ZIP not found."
-            echo "Repository files:"
-            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f | sort
+            echo "ERROR: V25.21 ZIP not found."
+            echo
+            echo "Available Gol Negar ZIP files:"
+            find "$GITHUB_WORKSPACE" \
+              -maxdepth 2 \
+              -type f \
+              -name 'GolNegar*.zip' \
+              -print \
+              | sort
             exit 1
           fi
 
           rm -rf "$GITHUB_WORKSPACE/build_source"
-
           mkdir -p "$GITHUB_WORKSPACE/build_source"
 
           unzip -q "$ZIP_FILE" \
@@ -83,57 +88,78 @@ jobs:
 
 
       # ─────────────────────────────────────
-      # Verify EXACT V25.18 source
+      # Verify EXACT V25.21 source
       # ─────────────────────────────────────
-      - name: Verify EXACT V25.18 source
+      - name: Verify EXACT V25.21 source
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -euo pipefail
 
-          echo "Checking project:"
+          echo "Project directory:"
           pwd
 
           echo
           echo "Checking version..."
 
-          if ! grep -q 'versionName = "25.18"' app/build.gradle.kts; then
-            echo "ERROR: versionName 25.18 not found."
+          if ! grep -q 'versionName = "25.21"' app/build.gradle.kts; then
+            echo "ERROR: versionName 25.21 not found."
+            echo
             grep -n 'versionName\|versionCode' app/build.gradle.kts || true
             exit 1
           fi
 
-          echo "OK: versionName 25.18"
+          echo "OK: versionName 25.21"
 
           echo
-          echo "Checking Firebase-related collections..."
+          echo "Checking greenhouse login source..."
 
-          if ! grep -q 'misc_sales' app/src/main/java/com/example/golyar/MainActivity.kt; then
-            echo "WARNING: misc_sales not found in MainActivity.kt"
-          fi
-
-          if ! grep -q 'greenhouse_payments' app/src/main/java/com/example/golyar/MainActivity.kt; then
-            echo "WARNING: greenhouse_payments not found in MainActivity.kt"
-          fi
-
-          if ! grep -q 'petty_cash_people' app/src/main/java/com/example/golyar/MainActivity.kt; then
-            echo "WARNING: petty_cash_people not found in MainActivity.kt"
+          if ! grep -q 'ERROR_USER_NOT_FOUND' \
+            app/src/main/java/com/example/golyar/MainActivity.kt; then
+            echo "WARNING: ERROR_USER_NOT_FOUND was not found."
+          else
+            echo "OK: Firebase user-not-found handling found."
           fi
 
           echo
-          echo "Source verification completed."
+          echo "Checking Firebase collections..."
+
+          for COLLECTION in \
+            flowers \
+            sellers \
+            deliveries \
+            sales \
+            returns \
+            payments \
+            misc_sales \
+            greenhouse_payments \
+            petty_cash_people \
+            settings
+          do
+            if grep -q "$COLLECTION" \
+              app/src/main/java/com/example/golyar/MainActivity.kt; then
+              echo "OK: $COLLECTION"
+            else
+              echo "WARNING: $COLLECTION not found"
+            fi
+          done
+
+          echo
+          echo "V25.21 source verification completed."
 
 
       # ─────────────────────────────────────
       # Build
       # ─────────────────────────────────────
-      - name: Build Gol Negar V25.18
+      - name: Build Gol Negar V25.21
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -euo pipefail
 
-          echo "Building Gol Negar V25.18..."
+          echo "========================================"
+          echo " BUILDING GOL NEGAR V25.21"
+          echo "========================================"
 
           gradle clean assembleDebug \
             --no-daemon \
@@ -158,7 +184,13 @@ jobs:
 
           if [ -z "${APK:-}" ]; then
             echo "ERROR: APK not found."
-            find app/build/outputs -type f 2>/dev/null || true
+
+            echo
+            echo "Available build outputs:"
+            find app/build/outputs \
+              -type f \
+              -print 2>/dev/null || true
+
             exit 1
           fi
 
@@ -168,28 +200,28 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/release"
 
           cp "$APK" \
-            "$GITHUB_WORKSPACE/release/GolNegar-v25.18-debug.apk"
+            "$GITHUB_WORKSPACE/release/GolNegar-v25.21-debug.apk"
 
 
       # ─────────────────────────────────────
       # Upload APK
       # ─────────────────────────────────────
-      - name: Upload Gol Negar V25.18 APK
+      - name: Upload Gol Negar V25.21 APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.18-debug-apk
-          path: release/GolNegar-v25.18-debug.apk
+          name: GolNegar-v25.21-debug-apk
+          path: release/GolNegar-v25.21-debug.apk
           if-no-files-found: error
 
 
       # ─────────────────────────────────────
       # Upload build log
       # ─────────────────────────────────────
-      - name: Upload V25.18 build log
+      - name: Upload V25.21 build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.18-build-log
+          name: GolNegar-v25.21-build-log
           path: |
             ${{ env.PROJECT_DIR }}/app/build/reports/**
             ${{ env.PROJECT_DIR }}/app/build/outputs/logs/**
