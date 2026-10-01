@@ -25,32 +25,26 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Locate EXACT Gol Negar V25.17 project
+      - name: Locate EXACT Gol Negar V25.18 project
         shell: bash
         run: |
           set -euo pipefail
 
           echo "========================================"
-          echo "       GOL NEGAR V25.17 BUILD"
+          echo "       GOL NEGAR V25.18 BUILD"
           echo "========================================"
 
-          # حالت اول:
-          # پروژه مستقیماً در ریشه Repository است.
           if [ -f "settings.gradle.kts" ] && [ -f "app/build.gradle.kts" ]; then
 
             echo "Gradle project found in repository root."
-
             PROJECT_DIR="$GITHUB_WORKSPACE"
 
           else
 
-            # حالت دوم:
-            # پروژه داخل ZIP نسخه 25.17 است.
-            ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.17_SellerPassword.zip"
+            ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.18_FirebaseConnectFix.zip"
 
             if [ ! -f "$ZIP_FILE" ]; then
-
-              echo "ERROR: V25.17 ZIP was not found."
+              echo "ERROR: V25.18 ZIP was not found."
               echo ""
               echo "Expected:"
               echo "$ZIP_FILE"
@@ -60,17 +54,15 @@ jobs:
                 -maxdepth 2 \
                 -type f \
                 | sort
-
               exit 1
             fi
 
             echo "========================================"
-            echo "Using EXACT V25.17 ZIP:"
+            echo "Using EXACT V25.18 ZIP:"
             echo "$ZIP_FILE"
             echo "========================================"
 
             rm -rf "$GITHUB_WORKSPACE/build_source"
-
             mkdir -p "$GITHUB_WORKSPACE/build_source"
 
             unzip -q "$ZIP_FILE" \
@@ -87,15 +79,11 @@ jobs:
               | head -n 1)
 
             if [ -z "$SETTINGS_FILE" ]; then
-
               echo "ERROR: settings.gradle.kts was not found."
-
               exit 1
-
             fi
 
             PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
@@ -105,7 +93,7 @@ jobs:
           echo "$PROJECT_DIR"
           echo "========================================"
 
-      - name: Verify EXACT V25.17 source
+      - name: Verify EXACT V25.18 source
         shell: bash
         run: |
           set -euo pipefail
@@ -136,22 +124,34 @@ jobs:
           grep -n "versionName" \
             app/build.gradle.kts || true
 
-          # فقط versionName بررسی می‌شود.
-          # versionCode ممکن است بین نسخه‌ها تغییر کند
-          # و نباید باعث توقف Build شود.
-
-          if ! grep -q 'versionName = "25.17"' \
+          if ! grep -q 'versionName = "25.18"' \
             app/build.gradle.kts; then
 
             echo ""
-            echo "ERROR: Source is NOT V25.17."
+            echo "ERROR: Source is NOT V25.18."
             echo "Build stopped intentionally."
-
             exit 1
           fi
 
           echo ""
-          echo "V25.17 source verification: PASSED"
+          echo "V25.18 source verification: PASSED"
+
+          echo ""
+          echo "========================================"
+          echo "Checking Firebase connection code..."
+          echo "========================================"
+
+          if grep -q "syncWithFirebaseIfOnline" \
+            app/src/main/java/com/example/golyar/MainActivity.kt; then
+
+            echo "Firebase sync function: FOUND"
+
+          else
+
+            echo "ERROR: Firebase sync function was not found."
+            exit 1
+
+          fi
 
           echo ""
           echo "========================================"
@@ -175,13 +175,13 @@ jobs:
           echo "SOURCE VERIFICATION PASSED"
           echo "========================================"
 
-      - name: Build Gol Negar V25.17
+      - name: Build Gol Negar V25.18
         shell: bash
         run: |
           set -euo pipefail
 
           echo "========================================"
-          echo "       BUILDING GOL NEGAR V25.17"
+          echo "       BUILDING GOL NEGAR V25.18"
           echo "========================================"
 
           cd "$PROJECT_DIR"
@@ -211,18 +211,15 @@ jobs:
             | head -n 1)
 
           if [ -z "$APK" ]; then
-
             echo ""
             echo "ERROR: APK was not created."
-
             exit 1
-
           fi
 
           mkdir -p release
 
           cp "$APK" \
-            "release/GolNegar-v25.17-debug.apk"
+            "release/GolNegar-v25.18-debug.apk"
 
           echo ""
           echo "========================================"
@@ -230,11 +227,11 @@ jobs:
           echo "========================================"
 
           ls -lh \
-            "release/GolNegar-v25.17-debug.apk"
+            "release/GolNegar-v25.18-debug.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.17-debug-apk
-          path: release/GolNegar-v25.17-debug.apk
+          name: GolNegar-v25.18-debug-apk
+          path: release/GolNegar-v25.18-debug.apk
           if-no-files-found: error
