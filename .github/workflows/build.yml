@@ -25,17 +25,14 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Locate EXACT Gol Negar v25.23 project
+      - name: Locate EXACT Gol Negar v25.24 project
         shell: bash
         run: |
           set -euo pipefail
 
-          ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.23_LoginAndSellerFix.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.24_SellerFirebaseFix.zip"
 
-          test -f "$ZIP_FILE" || {
-            echo "ERROR: v25.23 ZIP not found"
-            exit 1
-          }
+          test -f "$ZIP_FILE"
 
           rm -rf "$GITHUB_WORKSPACE/build_source"
           mkdir -p "$GITHUB_WORKSPACE/build_source"
@@ -48,32 +45,22 @@ jobs:
             -print \
             -quit | xargs -r dirname)
 
-          test -n "${PROJECT_DIR:-}" || {
-            echo "ERROR: Android project not found"
-            exit 1
-          }
+          test -n "${PROJECT_DIR:-}"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          echo "Using project:"
-          echo "$PROJECT_DIR"
-
-      - name: Verify EXACT v25.23 source
+      - name: Verify EXACT v25.24 source
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -euo pipefail
 
-          grep -q 'versionName = "25.23"' app/build.gradle.kts
+          grep -q 'versionName = "25.24"' app/build.gradle.kts
+          grep -q 'versionCode = 32' app/build.gradle.kts
 
-          grep -q 'versionCode = 31' app/build.gradle.kts
+          echo "v25.24 source verified."
 
-          grep -q 'whereEqualTo("seller_id", sellerId)' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "v25.23 source verification passed."
-
-      - name: Build Gol Negar v25.23
+      - name: Build Gol Negar v25.24
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -92,30 +79,25 @@ jobs:
             -name '*.apk' \
             -print | head -n 1)
 
-          test -n "${APK:-}" || {
-            echo "ERROR: APK not found"
-            exit 1
-          }
+          test -n "${APK:-}"
 
           mkdir -p "$GITHUB_WORKSPACE/release"
 
           cp "$APK" \
-            "$GITHUB_WORKSPACE/release/GolNegar-v25.23-debug.apk"
+            "$GITHUB_WORKSPACE/release/GolNegar-v25.24-debug.apk"
 
-          ls -lh "$GITHUB_WORKSPACE/release/GolNegar-v25.23-debug.apk"
-
-      - name: Upload Gol Negar v25.23 APK
+      - name: Upload Gol Negar v25.24 APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.23-debug-apk
-          path: release/GolNegar-v25.23-debug.apk
+          name: GolNegar-v25.24-debug-apk
+          path: release/GolNegar-v25.24-debug.apk
           if-no-files-found: error
 
-      - name: Upload v25.23 build log
+      - name: Upload v25.24 build logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.23-build-log
+          name: GolNegar-v25.24-build-log
           path: |
             ${{ env.PROJECT_DIR }}/app/build/reports/**
             ${{ env.PROJECT_DIR }}/app/build/outputs/logs/**
