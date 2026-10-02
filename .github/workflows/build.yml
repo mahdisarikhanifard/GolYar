@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -32,13 +33,20 @@ jobs:
 
           ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.26_SellerLoginFix2.zip"
 
-          echo "Checking ZIP:"
+          echo "======================================"
+          echo "Checking Gol Negar v25.26 ZIP"
+          echo "======================================"
           echo "$ZIP_FILE"
 
-          test -f "$ZIP_FILE" || {
-            echo "ERROR: v25.26 ZIP not found"
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "ERROR: v25.26 ZIP not found!"
+            echo ""
+            echo "Expected:"
+            echo "$ZIP_FILE"
             exit 1
-          }
+          fi
+
+          echo "ZIP found."
 
           rm -rf "$GITHUB_WORKSPACE/build_source"
           mkdir -p "$GITHUB_WORKSPACE/build_source"
@@ -53,15 +61,17 @@ jobs:
             -print \
             -quit | xargs -r dirname)
 
-          test -n "${PROJECT_DIR:-}" || {
-            echo "ERROR: Android project not found"
+          if [ -z "${PROJECT_DIR:-}" ]; then
+            echo "ERROR: Android project not found inside ZIP!"
             exit 1
-          }
+          fi
+
+          echo "======================================"
+          echo "Android project:"
+          echo "$PROJECT_DIR"
+          echo "======================================"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Using project:"
-          echo "$PROJECT_DIR"
 
       - name: Verify EXACT v25.26 source
         shell: bash
@@ -69,21 +79,46 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "Checking version..."
+          echo "======================================"
+          echo "VERIFYING GOL NEGAR V25.26"
+          echo "======================================"
 
-          grep -q 'versionName = "25.26"' \
-            app/build.gradle.kts || {
-              echo "ERROR: versionName 25.26 not found"
-              exit 1
-            }
+          if ! grep -q 'versionName = "25.26"' app/build.gradle.kts; then
+            echo "ERROR: versionName 25.26 not found!"
+            echo ""
+            echo "Current version information:"
+            grep -E 'versionCode|versionName' app/build.gradle.kts || true
+            exit 1
+          fi
 
-          grep -q 'versionCode = 33' \
-            app/build.gradle.kts || {
-              echo "ERROR: versionCode 33 not found"
-              exit 1
-            }
+          if ! grep -q 'versionCode = 34' app/build.gradle.kts; then
+            echo "ERROR: versionCode 34 not found!"
+            echo ""
+            echo "Current version information:"
+            grep -E 'versionCode|versionName' app/build.gradle.kts || true
+            exit 1
+          fi
 
-          echo "v25.26 source verification passed."
+          echo "versionName = 25.26"
+          echo "versionCode = 34"
+          echo ""
+          echo "v25.26 source verification PASSED."
+
+      - name: Show project files
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+
+          echo "======================================"
+          echo "PROJECT STRUCTURE"
+          echo "======================================"
+
+          find . \
+            -maxdepth 3 \
+            -type f \
+            | sort \
+            | head -200
 
       - name: Build Gol Negar v25.26
         shell: bash
@@ -91,14 +126,43 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "======================================"
           echo "BUILDING GOL NEGAR V25.26"
+          echo "======================================"
 
           gradle clean assembleDebug \
             --no-daemon \
             --stacktrace \
             --info
 
-      - name: Find APK
+      - name: Verify APK exists
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+
+          echo "======================================"
+          echo "SEARCHING FOR APK"
+          echo "======================================"
+
+          APK=$(find \
+            app/build/outputs/apk/debug \
+            -type f \
+            -name '*.apk' \
+            -print \
+            | head -n 1)
+
+          if [ -z "${APK:-}" ]; then
+            echo "ERROR: APK was not generated!"
+            exit 1
+          fi
+
+          echo "APK found:"
+          echo "$APK"
+
+          ls -lh "$APK"
+
+      - name: Prepare release APK
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -108,19 +172,23 @@ jobs:
             app/build/outputs/apk/debug \
             -type f \
             -name '*.apk' \
-            -print | head -n 1)
+            -print \
+            | head -n 1)
 
-          test -n "${APK:-}" || {
-            echo "ERROR: APK not found"
+          if [ -z "${APK:-}" ]; then
+            echo "ERROR: APK not found!"
             exit 1
-          }
+          fi
 
           mkdir -p "$GITHUB_WORKSPACE/release"
 
           cp "$APK" \
             "$GITHUB_WORKSPACE/release/GolNegar-v25.26-debug.apk"
 
-          echo "APK created:"
+          echo "======================================"
+          echo "FINAL APK"
+          echo "======================================"
+
           ls -lh \
             "$GITHUB_WORKSPACE/release/GolNegar-v25.26-debug.apk"
 
