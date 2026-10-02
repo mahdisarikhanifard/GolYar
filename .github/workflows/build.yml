@@ -25,48 +25,78 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Locate EXACT Gol Negar v25.24 project
+      - name: Locate EXACT Gol Negar v25.26 project
         shell: bash
         run: |
           set -euo pipefail
 
-          ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.24_SellerFirebaseFix.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/GolNegar_GitHubReady_v25.26_SellerLoginFix2.zip"
 
-          test -f "$ZIP_FILE"
+          echo "Checking ZIP:"
+          echo "$ZIP_FILE"
+
+          test -f "$ZIP_FILE" || {
+            echo "ERROR: v25.26 ZIP not found"
+            exit 1
+          }
 
           rm -rf "$GITHUB_WORKSPACE/build_source"
           mkdir -p "$GITHUB_WORKSPACE/build_source"
 
-          unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/build_source"
+          unzip -q "$ZIP_FILE" \
+            -d "$GITHUB_WORKSPACE/build_source"
 
-          PROJECT_DIR=$(find "$GITHUB_WORKSPACE/build_source" \
+          PROJECT_DIR=$(find \
+            "$GITHUB_WORKSPACE/build_source" \
             -type f \
             -name 'settings.gradle.kts' \
             -print \
             -quit | xargs -r dirname)
 
-          test -n "${PROJECT_DIR:-}"
+          test -n "${PROJECT_DIR:-}" || {
+            echo "ERROR: Android project not found"
+            exit 1
+          }
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Verify EXACT v25.24 source
+          echo "Using project:"
+          echo "$PROJECT_DIR"
+
+      - name: Verify EXACT v25.26 source
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -euo pipefail
 
-          grep -q 'versionName = "25.24"' app/build.gradle.kts
-          grep -q 'versionCode = 32' app/build.gradle.kts
+          echo "Checking version..."
 
-          echo "v25.24 source verified."
+          grep -q 'versionName = "25.26"' \
+            app/build.gradle.kts || {
+              echo "ERROR: versionName 25.26 not found"
+              exit 1
+            }
 
-      - name: Build Gol Negar v25.24
+          grep -q 'versionCode = 33' \
+            app/build.gradle.kts || {
+              echo "ERROR: versionCode 33 not found"
+              exit 1
+            }
+
+          echo "v25.26 source verification passed."
+
+      - name: Build Gol Negar v25.26
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -euo pipefail
 
-          gradle clean assembleDebug --no-daemon --stacktrace --info
+          echo "BUILDING GOL NEGAR V25.26"
+
+          gradle clean assembleDebug \
+            --no-daemon \
+            --stacktrace \
+            --info
 
       - name: Find APK
         shell: bash
@@ -74,30 +104,38 @@ jobs:
         run: |
           set -euo pipefail
 
-          APK=$(find app/build/outputs/apk/debug \
+          APK=$(find \
+            app/build/outputs/apk/debug \
             -type f \
             -name '*.apk' \
             -print | head -n 1)
 
-          test -n "${APK:-}"
+          test -n "${APK:-}" || {
+            echo "ERROR: APK not found"
+            exit 1
+          }
 
           mkdir -p "$GITHUB_WORKSPACE/release"
 
           cp "$APK" \
-            "$GITHUB_WORKSPACE/release/GolNegar-v25.24-debug.apk"
+            "$GITHUB_WORKSPACE/release/GolNegar-v25.26-debug.apk"
 
-      - name: Upload Gol Negar v25.24 APK
+          echo "APK created:"
+          ls -lh \
+            "$GITHUB_WORKSPACE/release/GolNegar-v25.26-debug.apk"
+
+      - name: Upload Gol Negar v25.26 APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.24-debug-apk
-          path: release/GolNegar-v25.24-debug.apk
+          name: GolNegar-v25.26-debug-apk
+          path: release/GolNegar-v25.26-debug.apk
           if-no-files-found: error
 
-      - name: Upload v25.24 build logs
+      - name: Upload v25.26 build logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.24-build-log
+          name: GolNegar-v25.26-build-log
           path: |
             ${{ env.PROJECT_DIR }}/app/build/reports/**
             ${{ env.PROJECT_DIR }}/app/build/outputs/logs/**
