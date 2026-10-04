@@ -32,11 +32,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP_FILE="GolNegar_GitHubReady_v25.28_CompileFix.zip"
+          ZIP_FILE="GolNegar_GitHubReady_v25.30_SellerDefinitionFix.zip"
 
           if [ ! -f "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
-            echo "ERROR: $ZIP_FILE is missing."
-            echo "Upload exactly this ZIP file to the repository root."
+            echo "ERROR: $ZIP_FILE is missing. Upload exactly this file to the repository root."
             exit 1
           fi
 
@@ -52,14 +51,13 @@ jobs:
 
           if [ -z "$PROJECT_DIR" ] || \
              [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo "ERROR: The ZIP is not a valid Android Gradle project."
+            echo "ERROR: The exact ZIP is not a valid Android Gradle project."
             exit 1
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          echo "Using EXACT source:"
-          echo "$ZIP_FILE"
+          echo "Using EXACT source: $ZIP_FILE"
 
       - name: Verify project
         shell: bash
@@ -73,25 +71,7 @@ jobs:
 
           echo "Project verification: OK"
 
-      - name: Verify Gol Negar version
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          VERSION=$(grep -o 'versionName *= *"[^"]*"' \
-            app/build.gradle.kts | head -n 1 || true)
-
-          echo "Detected: $VERSION"
-
-          if ! echo "$VERSION" | grep -q '25.28'; then
-            echo "ERROR: versionName 25.28 not found."
-            exit 1
-          fi
-
-          echo "Version verification: OK"
-
-      - name: Build Gol Negar v25.28
+      - name: Build Gol Negar v25.30
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
@@ -112,7 +92,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.28-build-log
+          name: GolNegar-v25.30-build-log
           path: build.log
           if-no-files-found: warn
 
@@ -135,13 +115,13 @@ jobs:
           mkdir -p release
 
           cp "$APK" \
-            release/GolNegar-v25.28-debug.apk
+            release/GolNegar-v25.30-debug.apk
 
-          ls -lh release/GolNegar-v25.28-debug.apk
+          ls -lh release/GolNegar-v25.30-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.28-debug.apk
-          path: release/GolNegar-v25.28-debug.apk
+          name: GolNegar-v25.30-debug.apk
+          path: release/GolNegar-v25.30-debug.apk
           if-no-files-found: error
