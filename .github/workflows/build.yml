@@ -32,10 +32,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP_FILE="GolNegar_GitHubReady_v1.1.7_PaymentReportsFix.zip"
+          ZIP_FILE="GolNegar_GitHubReady_v1.1.8_SellerSyncRaceFix.zip"
 
           if [ ! -f "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
-            echo "ERROR: $ZIP_FILE is missing. Upload exactly this file to the repository root."
+            echo "ERROR: $ZIP_FILE is missing."
+            echo "Files found in repository root:"
+            find "$GITHUB_WORKSPACE" -maxdepth 1 -type f -printf '%f\n'
             exit 1
           fi
 
@@ -51,7 +53,7 @@ jobs:
 
           if [ -z "$PROJECT_DIR" ] || \
              [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo "ERROR: The exact ZIP is not a valid Android Gradle project."
+            echo "ERROR: The ZIP is not a valid Android Gradle project."
             exit 1
           fi
 
@@ -74,7 +76,7 @@ jobs:
 
           echo "Project verification: OK"
 
-      - name: Build Gol Negar v1.1.7
+      - name: Build Gol Negar v1.1.8
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
@@ -96,7 +98,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.1.7-build-log
+          name: GolNegar-v1.1.8-build-log
           path: build.log
           if-no-files-found: warn
 
@@ -117,13 +119,13 @@ jobs:
 
           mkdir -p release
 
-          cp "$APK" release/GolNegar-v1.1.7-debug.apk
+          cp "$APK" release/GolNegar-v1.1.8-debug.apk
 
-          ls -lh release/GolNegar-v1.1.7-debug.apk
+          ls -lh release/GolNegar-v1.1.8-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.1.7-debug.apk
-          path: release/GolNegar-v1.1.7-debug.apk
+          name: GolNegar-v1.1.8-debug.apk
+          path: release/GolNegar-v1.1.8-debug.apk
           if-no-files-found: error
