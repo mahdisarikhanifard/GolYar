@@ -33,7 +33,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP_FILE="GolNegar_UIFix_1010.zip"
+          ZIP_FILE="GolNegar_UIFix_1010_FIXED.zip""
 
           echo "========================================"
           echo "SEARCHING FOR SOURCE ZIP"
