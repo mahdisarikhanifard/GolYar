@@ -30,7 +30,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP_FILE="GolNegar_UIFix_1010_FIXED.zip"
+          ZIP_FILE="GolNegar_SyncStatusFix_1010.zip"
 
           echo "Looking for: $ZIP_FILE"
 
