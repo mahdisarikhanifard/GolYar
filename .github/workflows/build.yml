@@ -31,10 +31,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="GolNegar_GitHubReady_v1.1.4.zip"
+
+          ZIP_FILE="GolNegar_GitHubReady_v1.1.5_AutoBackup.zip"
 
           if [ ! -f "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
-            echo "ERROR: $ZIP_FILE is missing. Upload exactly this file to the repository root."
+            echo "ERROR: $ZIP_FILE is missing."
+            echo "Files found in repository root:"
+            find "$GITHUB_WORKSPACE" -maxdepth 1 -type f -printf '%f\n'
             exit 1
           fi
 
@@ -48,13 +51,18 @@ jobs:
             -name 'settings.gradle.kts' \
             -print -quit | xargs -r dirname)
 
-          if [ -z "$PROJECT_DIR" ] || [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo "ERROR: The exact ZIP is not a valid Android Gradle project."
+          if [ -z "$PROJECT_DIR" ] || \
+             [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
+            echo "ERROR: The ZIP is not a valid Android Gradle project."
             exit 1
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Using EXACT source: $ZIP_FILE"
+
+          echo "======================================"
+          echo "Using EXACT source:"
+          echo "$ZIP_FILE"
+          echo "======================================"
 
       - name: Verify project
         shell: bash
@@ -68,7 +76,7 @@ jobs:
 
           echo "Project verification: OK"
 
-      - name: Build Gol Negar v1.1.4
+      - name: Build Gol Negar v1.1.5
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
@@ -90,7 +98,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.1.4-build-log
+          name: GolNegar-v1.1.5-build-log
           path: build.log
           if-no-files-found: warn
 
@@ -101,7 +109,8 @@ jobs:
 
           APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" \
             -type f \
-            -name '*.apk' | head -n 1 || true)
+            -name '*.apk' \
+            | head -n 1 || true)
 
           if [ -z "$APK" ]; then
             echo "ERROR: APK was not created."
@@ -110,13 +119,13 @@ jobs:
 
           mkdir -p release
 
-          cp "$APK" release/GolNegar-v1.1.4-debug.apk
+          cp "$APK" release/GolNegar-v1.1.5-debug.apk
 
-          ls -lh release/GolNegar-v1.1.4-debug.apk
+          ls -lh release/GolNegar-v1.1.5-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.1.4-debug.apk
-          path: release/GolNegar-v1.1.4-debug.apk
+          name: GolNegar-v1.1.5-debug.apk
+          path: release/GolNegar-v1.1.5-debug.apk
           if-no-files-found: error
