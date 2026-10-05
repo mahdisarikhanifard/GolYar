@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP_FILE="GolNegar_GitHubReady_v1.1.5_AutoBackup.zip"
+          ZIP_FILE="GolNegar_GitHubReady_v1.1.6_AutoBackup.zip"
 
           if [ ! -f "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
             echo "ERROR: $ZIP_FILE is missing."
@@ -76,7 +76,7 @@ jobs:
 
           echo "Project verification: OK"
 
-      - name: Build Gol Negar v1.1.5
+      - name: Build Gol Negar v1.1.6
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
@@ -98,7 +98,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.1.5-build-log
+          name: GolNegar-v1.1.6-build-log
           path: build.log
           if-no-files-found: warn
 
@@ -119,13 +119,13 @@ jobs:
 
           mkdir -p release
 
-          cp "$APK" release/GolNegar-v1.1.5-debug.apk
+          cp "$APK" release/GolNegar-v1.1.6-debug.apk
 
-          ls -lh release/GolNegar-v1.1.5-debug.apk
+          ls -lh release/GolNegar-v1.1.6-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.1.5-debug.apk
-          path: release/GolNegar-v1.1.5-debug.apk
+          name: GolNegar-v1.1.6-debug.apk
+          path: release/GolNegar-v1.1.6-debug.apk
           if-no-files-found: error
