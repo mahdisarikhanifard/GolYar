@@ -35,70 +35,208 @@ jobs:
 
           ZIP_FILE="GolNegar_UIFix_1010.zip"
 
+          echo "========================================"
+          echo "SEARCHING FOR SOURCE ZIP"
+          echo "========================================"
+          echo "Expected: $ZIP_FILE"
+          echo ""
+
           if [ ! -f "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
-            echo "ERROR: $ZIP_FILE is missing."
+            echo "ERROR: $ZIP_FILE was not found."
+            echo ""
+            echo "ZIP files in repository root:"
+            find "$GITHUB_WORKSPACE" \
+              -maxdepth 1 \
+              -type f \
+              -name '*.zip' \
+              -printf '%f\n' \
+              | sort
+
             exit 1
           fi
+
+          echo "FOUND: $ZIP_FILE"
 
           rm -rf build_source
           mkdir -p build_source
 
           unzip -q "$GITHUB_WORKSPACE/$ZIP_FILE" -d build_source
 
+          echo ""
+          echo "ZIP CONTENT CHECK:"
+          find build_source -maxdepth 3 -type f | head -n 80
+
           PROJECT_DIR=$(find "$GITHUB_WORKSPACE/build_source" \
             -type f \
             -name 'settings.gradle.kts' \
-            -print -quit | xargs -r dirname)
+            -print -quit \
+            | xargs -r dirname)
 
-          if [ -z "$PROJECT_DIR" ] || [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo "ERROR: The ZIP is not a valid Android Gradle project."
+          if [ -z "$PROJECT_DIR" ]; then
+            echo ""
+            echo "ERROR: settings.gradle.kts was not found inside ZIP."
+            exit 1
+          fi
+
+          if [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
+            echo ""
+            echo "ERROR: app/build.gradle.kts was not found."
+            exit 1
+          fi
+
+          if [ ! -f "$PROJECT_DIR/app/src/main/java/com/example/golyar/MainActivity.kt" ]; then
+            echo ""
+            echo "ERROR: MainActivity.kt was not found."
             exit 1
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          echo "Using EXACT source: $ZIP_FILE"
+          echo ""
+          echo "========================================"
+          echo "EXACT SOURCE SELECTED"
+          echo "========================================"
+          echo "ZIP: $ZIP_FILE"
+          echo "PROJECT: $PROJECT_DIR"
+          echo "========================================"
 
       - name: Verify project
         shell: bash
         run: |
           set -euo pipefail
 
+          echo "Checking project files..."
+
           test -f "$PROJECT_DIR/settings.gradle.kts"
           test -f "$PROJECT_DIR/build.gradle.kts"
           test -f "$PROJECT_DIR/app/build.gradle.kts"
           test -f "$PROJECT_DIR/app/google-services.json"
+          test -f "$PROJECT_DIR/app/src/main/java/com/example/golyar/MainActivity.kt"
 
+          echo ""
           echo "Project verification: OK"
+
+      - name: Show source information
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          echo "========================================"
+          echo "SOURCE INFORMATION"
+          echo "========================================"
+
+          echo ""
+          echo "--- Version ---"
+          grep -n "versionName" app/build.gradle.kts || true
+
+          echo ""
+          echo "--- MainActivity ---"
+          wc -c app/src/main/java/com/example/golyar/MainActivity.kt
+
+          echo ""
+          echo "--- MainActivity SHA256 ---"
+          sha256sum app/src/main/java/com/example/golyar/MainActivity.kt
+
+          echo ""
+          echo "========================================"
 
       - name: Build Gol Negar
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -euo pipefail
-          gradle clean assembleDebug --no-daemon --stacktrace --info
+          set +e
+
+          echo ""
+          echo "========================================"
+          echo "STARTING GRADLE BUILD"
+          echo "========================================"
+
+          gradle clean assembleDebug \
+            --no-daemon \
+            --stacktrace \
+            --info \
+            2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+
+          status=${PIPESTATUS[0]}
+
+          echo ""
+          echo "========================================"
+          echo "GRADLE EXIT CODE: $status"
+          echo "========================================"
+
+          echo ""
+          echo "========================================"
+          echo "KOTLIN / GRADLE ERRORS"
+          echo "========================================"
+
+          if [ -f "$GITHUB_WORKSPACE/build.log" ]; then
+
+            grep -n -E \
+              '(^|[^A-Za-z])(e:|error:|ERROR|FAILURE:|Execution failed|Syntax error|Unresolved reference|CompilationErrorException|Caused by:)' \
+              "$GITHUB_WORKSPACE/build.log" \
+              | tail -n 200 || true
+
+          else
+            echo "ERROR: build.log was not created."
+          fi
+
+          echo ""
+          echo "========================================"
+          echo "LAST 200 LINES OF BUILD LOG"
+          echo "========================================"
+
+          if [ -f "$GITHUB_WORKSPACE/build.log" ]; then
+            tail -n 200 "$GITHUB_WORKSPACE/build.log"
+          fi
+
+          echo ""
+          echo "========================================"
+          echo "END OF BUILD LOG"
+          echo "========================================"
+
+          exit "$status"
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GolNegar-build-log
+          path: build.log
+          if-no-files-found: warn
 
       - name: Prepare APK
+        if: success()
         shell: bash
         run: |
           set -euo pipefail
 
+          echo "========================================"
+          echo "SEARCHING FOR APK"
+          echo "========================================"
+
           APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" \
             -type f \
             -name '*.apk' \
-            | head -n 1)
+            | head -n 1 || true)
 
           if [ -z "$APK" ]; then
+            echo ""
             echo "ERROR: APK was not created."
             exit 1
           fi
 
           mkdir -p release
+
           cp "$APK" release/GolNegar-debug.apk
 
+          echo ""
+          echo "APK CREATED:"
+          echo "$APK"
+
+          echo ""
           ls -lh release/GolNegar-debug.apk
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: GolNegar-debug.apk
