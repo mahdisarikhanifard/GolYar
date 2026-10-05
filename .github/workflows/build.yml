@@ -31,19 +31,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="GolNegar_GitHubReady_v25.32_SellerSyncFix.zip"
+          ZIP_FILE="GolNegar_GitHubReady_v25.33_SellerSyncPermissionFix.zip"
+
           if [ ! -f "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
             echo "ERROR: $ZIP_FILE is missing. Upload exactly this file to the repository root."
             exit 1
           fi
+
           rm -rf build_source
           mkdir -p build_source
+
           unzip -q "$GITHUB_WORKSPACE/$ZIP_FILE" -d build_source
-          PROJECT_DIR=$(find "$GITHUB_WORKSPACE/build_source" -type f -name 'settings.gradle.kts' -print -quit | xargs -r dirname)
+
+          PROJECT_DIR=$(find "$GITHUB_WORKSPACE/build_source" \
+            -type f \
+            -name 'settings.gradle.kts' \
+            -print -quit | xargs -r dirname)
+
           if [ -z "$PROJECT_DIR" ] || [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
             echo "ERROR: The exact ZIP is not a valid Android Gradle project."
             exit 1
           fi
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Using EXACT source: $ZIP_FILE"
 
@@ -51,27 +60,37 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           test -f "$PROJECT_DIR/settings.gradle.kts"
           test -f "$PROJECT_DIR/build.gradle.kts"
           test -f "$PROJECT_DIR/app/build.gradle.kts"
           test -f "$PROJECT_DIR/app/google-services.json"
+
           echo "Project verification: OK"
 
-      - name: Build Gol Negar v25.32
+      - name: Build Gol Negar v25.33
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set +e
-          gradle clean assembleDebug --no-daemon --stacktrace --info 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+
+          gradle clean assembleDebug \
+            --no-daemon \
+            --stacktrace \
+            --info \
+            2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+
           status=${PIPESTATUS[0]}
+
           echo "Gradle exit code: $status"
+
           exit "$status"
 
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.32-build-log
+          name: GolNegar-v25.33-build-log
           path: build.log
           if-no-files-found: warn
 
@@ -79,18 +98,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" -type f -name '*.apk' | head -n 1 || true)
+
+          APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" \
+            -type f \
+            -name '*.apk' | head -n 1 || true)
+
           if [ -z "$APK" ]; then
             echo "ERROR: APK was not created."
             exit 1
           fi
+
           mkdir -p release
-          cp "$APK" release/GolNegar-v25.32-debug.apk
-          ls -lh release/GolNegar-v25.32-debug.apk
+
+          cp "$APK" release/GolNegar-v25.33-debug.apk
+
+          ls -lh release/GolNegar-v25.33-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v25.32-debug.apk
-          path: release/GolNegar-v25.32-debug.apk
+          name: GolNegar-v25.33-debug.apk
+          path: release/GolNegar-v25.33-debug.apk
           if-no-files-found: error
