@@ -9,7 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
 
@@ -28,159 +27,86 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Locate newest Gol Negar source
+      - name: Locate exact Gol Negar source
         shell: bash
         run: |
           set -euo pipefail
+          ZIP_FILE="GolNegar_GitHubReady_v1.1.10_BuildSyncHardening.zip"
 
-          echo "======================================"
-          echo "Searching for Gol Negar source ZIP..."
-          echo "======================================"
-
-          ZIP_FILE=$(find "$GITHUB_WORKSPACE" \
-            -maxdepth 2 \
-            -type f \
-            -iname 'GolNegar_GitHubReady_*.zip' \
-            -printf '%T@ %p\n' \
-            | sort -nr \
-            | head -n 1 \
-            | cut -d' ' -f2- || true)
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: No GolNegar_GitHubReady_*.zip was found."
-            echo
-            echo "Available ZIP files:"
-            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -iname '*.zip' -print | sort || true
+          if [ ! -f "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
+            echo "ERROR: $ZIP_FILE is missing. Upload exactly this file to the repository root."
             exit 1
           fi
 
-          echo "Selected source ZIP:"
-          echo "$ZIP_FILE"
+          rm -rf build_source
+          mkdir -p build_source
 
-          rm -rf "$GITHUB_WORKSPACE/build_source"
-          mkdir -p "$GITHUB_WORKSPACE/build_source"
-
-          unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/build_source"
+          unzip -q "$GITHUB_WORKSPACE/$ZIP_FILE" -d build_source
 
           PROJECT_DIR=$(find "$GITHUB_WORKSPACE/build_source" \
             -type f \
             -name 'settings.gradle.kts' \
-            -print -quit \
-            | xargs -r dirname)
+            -print \
+            -quit | xargs -r dirname)
 
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: settings.gradle.kts was not found inside the ZIP."
-            find "$GITHUB_WORKSPACE/build_source" -maxdepth 6 -type f | sort
-            exit 1
-          fi
-
-          if [ ! -f "$PROJECT_DIR/build.gradle.kts" ]; then
-            echo "ERROR: build.gradle.kts is missing."
-            exit 1
-          fi
-
-          if [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo "ERROR: app/build.gradle.kts is missing."
+          if [ -z "$PROJECT_DIR" ] || [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
+            echo "ERROR: The exact ZIP is not a valid Android Gradle project."
             exit 1
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "SOURCE_ZIP=$ZIP_FILE" >> "$GITHUB_ENV"
+          echo "Using EXACT source: $ZIP_FILE"
 
-          echo "======================================"
-          echo "Source selected successfully."
-          echo "PROJECT_DIR=$PROJECT_DIR"
-          echo "======================================"
+      - name: Validate source before Gradle
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -s app/src/main/java/com/example/golyar/MainActivity.kt
+
+          grep -q 'private fun sectionTitle' \
+            app/src/main/java/com/example/golyar/MainActivity.kt
+
+          grep -q 'versionName = "1.1.10"' \
+            app/build.gradle.kts
+
+          echo "Source validation: OK"
 
       - name: Verify project
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "Checking Android project..."
-
           test -f "$PROJECT_DIR/settings.gradle.kts"
           test -f "$PROJECT_DIR/build.gradle.kts"
           test -f "$PROJECT_DIR/app/build.gradle.kts"
-
-          if [ ! -f "$PROJECT_DIR/app/google-services.json" ]; then
-            echo "WARNING: google-services.json was not found."
-          fi
+          test -f "$PROJECT_DIR/app/google-services.json"
 
           echo "Project verification: OK"
 
-          echo
-          echo "Project files:"
-          find "$PROJECT_DIR" -maxdepth 3 -type f \
-            \( -name '*.gradle' -o -name '*.gradle.kts' -o -name 'AndroidManifest.xml' \) \
-            -print | sort
-
-      - name: Show build environment
-        shell: bash
-        run: |
-          set +e
-
-          echo "Java:"
-          java -version
-
-          echo
-          echo "Gradle:"
-          gradle --version
-
-          echo
-          echo "Selected ZIP:"
-          echo "$SOURCE_ZIP"
-
-          echo
-          echo "Project:"
-          echo "$PROJECT_DIR"
-
-      - name: Build Gol Negar
+      - name: Build Gol Negar v1.1.10
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set +e
 
-          echo "======================================"
-          echo "BUILDING GOL NEGAR"
-          echo "======================================"
-          echo "Source: $SOURCE_ZIP"
-          echo "Project: $PROJECT_DIR"
-          echo
-
           gradle clean assembleDebug \
             --no-daemon \
             --stacktrace \
-            --info \
-            2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+            --info 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
 
           status=${PIPESTATUS[0]}
 
-          echo
-          echo "======================================"
           echo "Gradle exit code: $status"
-          echo "======================================"
-
-          if [ "$status" -ne 0 ]; then
-            echo
-            echo "========== IMPORTANT ERROR LINES =========="
-
-            grep -n -E \
-              "FAILURE:|What went wrong:|Execution failed|Caused by:|error:|e: |Unresolved reference|AAPT|Manifest merger|Could not" \
-              "$GITHUB_WORKSPACE/build.log" \
-              | tail -n 100 || true
-
-            echo
-            echo "========== END ERROR SUMMARY =========="
-          fi
 
           exit "$status"
 
-      - name: Upload complete build log
+      - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-build-log
+          name: GolNegar-v1.1.10-build-log
           path: build.log
           if-no-files-found: warn
 
@@ -191,35 +117,22 @@ jobs:
 
           APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" \
             -type f \
-            -name '*.apk' \
-            -print \
-            | head -n 1 || true)
+            -name '*.apk' | head -n 1 || true)
 
           if [ -z "$APK" ]; then
             echo "ERROR: APK was not created."
-
-            echo
-            echo "Searching build outputs:"
-            find "$PROJECT_DIR/app/build" \
-              -maxdepth 6 \
-              -type f \
-              \( -name '*.apk' -o -name '*.aab' \) \
-              -print || true
-
             exit 1
           fi
 
-          mkdir -p "$GITHUB_WORKSPACE/release"
+          mkdir -p release
 
-          cp "$APK" \
-            "$GITHUB_WORKSPACE/release/GolNegar-debug.apk"
+          cp "$APK" release/GolNegar-v1.1.10-debug.apk
 
-          echo "APK created:"
-          ls -lh "$GITHUB_WORKSPACE/release/GolNegar-debug.apk"
+          ls -lh release/GolNegar-v1.1.10-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-debug-apk
-          path: release/GolNegar-debug.apk
+          name: GolNegar-v1.1.10-debug.apk
+          path: release/GolNegar-v1.1.10-debug.apk
           if-no-files-found: error
