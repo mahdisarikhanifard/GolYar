@@ -52,7 +52,7 @@ jobs:
           rm -rf build_source
           mkdir -p build_source
 
-          unzip -q "GolNegar_UIFix_1010_FIXED.zip" -d build_source
+          unzip -q "GolNegar_SyncStatusFix_1010.zip" -d build_source
 
           echo "Extracted project:"
           find build_source -maxdepth 3 -type f \
@@ -64,7 +64,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          PROJECT_DIR="$(find "$GITHUB_WORKSPACE/build_source" -name "settings.gradle.kts" -type f -print -quit)"
+          PROJECT_DIR="$(find "$GITHUB_WORKSPACE/build_source" \
+            -name "settings.gradle.kts" \
+            -type f \
+            -print -quit)"
 
           if [ -z "$PROJECT_DIR" ]; then
             echo "ERROR: settings.gradle.kts not found."
@@ -87,9 +90,11 @@ jobs:
           test -f "$PROJECT_DIR/app/build.gradle.kts"
           test -f "$PROJECT_DIR/app/src/main/java/com/example/golyar/MainActivity.kt"
 
-          echo "MainActivity:"
-          grep -n "همگام‌سازی کامل نشد" \
-            "$PROJECT_DIR/app/src/main/java/com/example/golyar/MainActivity.kt" || true
+          echo "MainActivity sync-related code:"
+          grep -n -E \
+            "syncWithFirebaseIfOnline|last_sync|last_sync_error" \
+            "$PROJECT_DIR/app/src/main/java/com/example/golyar/MainActivity.kt" \
+            || true
 
           echo "Source verification OK."
 
@@ -116,8 +121,19 @@ jobs:
           if [ "$STATUS" -ne 0 ]; then
             echo ""
             echo "========================================"
-            echo "LAST BUILD LOG"
+            echo "KOTLIN / GRADLE ERRORS"
             echo "========================================"
+
+            grep -n -E \
+              '(^|[^A-Za-z])(e:|error:|ERROR|FAILURE:|Execution failed|Syntax error|Unresolved reference|CompilationErrorException|Caused by:)' \
+              "$GITHUB_WORKSPACE/build.log" \
+              | tail -n 200 || true
+
+            echo ""
+            echo "========================================"
+            echo "LAST 250 LINES OF BUILD LOG"
+            echo "========================================"
+
             tail -n 250 "$GITHUB_WORKSPACE/build.log"
           fi
 
@@ -142,6 +158,7 @@ jobs:
           cp "$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" \
              "$GITHUB_WORKSPACE/apk_output/GolNegar-debug.apk"
 
+          echo "APK created successfully:"
           ls -lh "$GITHUB_WORKSPACE/apk_output/GolNegar-debug.apk"
 
       - name: Upload APK
