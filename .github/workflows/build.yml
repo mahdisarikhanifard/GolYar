@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -30,18 +31,24 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP_FILE="GolNegar_FeaturesAndSellerSyncFix_1011.zip"
+          ZIP_FILE="GolNegar_SellerSyncRebuild_120.zip"
 
-          echo "Looking for: $ZIP_FILE"
+          echo "========================================"
+          echo "Looking for source ZIP"
+          echo "========================================"
+          echo "ZIP_FILE=$ZIP_FILE"
 
           if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: ZIP file not found."
-            echo "ZIP files in repository:"
-            find . -maxdepth 2 -type f -name "*.zip" -print
+            echo ""
+            echo "ERROR: Source ZIP not found."
+            echo ""
+            echo "ZIP files available in repository:"
+            find . -maxdepth 3 -type f -name "*.zip" -print
             exit 1
           fi
 
-          echo "Found:"
+          echo ""
+          echo "Source ZIP found:"
           ls -lh "$ZIP_FILE"
 
       - name: Extract project
@@ -52,11 +59,17 @@ jobs:
           rm -rf build_source
           mkdir -p build_source
 
-          unzip -q "GolNegar_SyncStatusFix_1010.zip" -d build_source
+          echo "Extracting source..."
 
-          echo "Extracted project:"
-          find build_source -maxdepth 3 -type f \
-            \( -name "settings.gradle.kts" -o -name "build.gradle.kts" \) \
+          unzip -q "GolNegar_SellerSyncRebuild_120.zip" \
+            -d build_source
+
+          echo ""
+          echo "Extracted Gradle files:"
+          find build_source -maxdepth 4 -type f \
+            \( -name "settings.gradle.kts" \
+            -o -name "build.gradle.kts" \
+            -o -name "gradlew" \) \
             -print
 
       - name: Find Gradle project
@@ -64,39 +77,64 @@ jobs:
         run: |
           set -euo pipefail
 
-          PROJECT_DIR="$(find "$GITHUB_WORKSPACE/build_source" \
+          PROJECT_SETTINGS="$(find "$GITHUB_WORKSPACE/build_source" \
             -name "settings.gradle.kts" \
             -type f \
             -print -quit)"
 
-          if [ -z "$PROJECT_DIR" ]; then
+          if [ -z "$PROJECT_SETTINGS" ]; then
             echo "ERROR: settings.gradle.kts not found."
             exit 1
           fi
 
-          PROJECT_DIR="$(dirname "$PROJECT_DIR")"
+          PROJECT_DIR="$(dirname "$PROJECT_SETTINGS")"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          echo "Project directory:"
+          echo ""
+          echo "========================================"
+          echo "PROJECT DIRECTORY"
+          echo "========================================"
           echo "$PROJECT_DIR"
 
-      - name: Verify source
+      - name: Verify project
         shell: bash
         run: |
           set -euo pipefail
 
-          test -f "$PROJECT_DIR/settings.gradle.kts"
-          test -f "$PROJECT_DIR/app/build.gradle.kts"
-          test -f "$PROJECT_DIR/app/src/main/java/com/example/golyar/MainActivity.kt"
+          echo "========================================"
+          echo "VERIFYING PROJECT"
+          echo "========================================"
 
-          echo "MainActivity sync-related code:"
+          test -f "$PROJECT_DIR/settings.gradle.kts"
+          test -f "$PROJECT_DIR/build.gradle.kts"
+          test -f "$PROJECT_DIR/app/build.gradle.kts"
+
+          test -f \
+            "$PROJECT_DIR/app/src/main/java/com/example/golyar/MainActivity.kt"
+
+          echo ""
+          echo "MainActivity found."
+
+          echo ""
+          echo "Checking Firebase configuration..."
+
+          if [ -f "$PROJECT_DIR/app/google-services.json" ]; then
+            echo "google-services.json found."
+          else
+            echo "WARNING: google-services.json not found."
+          fi
+
+          echo ""
+          echo "Checking seller Sync code..."
+
           grep -n -E \
-            "syncWithFirebaseIfOnline|last_sync|last_sync_error" \
+            "syncWithFirebaseIfOnline|seller_remote_id|last_sync|last_sync_error|FirebaseAuth|FirebaseFirestore" \
             "$PROJECT_DIR/app/src/main/java/com/example/golyar/MainActivity.kt" \
             || true
 
-          echo "Source verification OK."
+          echo ""
+          echo "Source verification completed."
 
       - name: Build APK
         shell: bash
@@ -104,6 +142,10 @@ jobs:
           set +e
 
           cd "$PROJECT_DIR"
+
+          echo "========================================"
+          echo "BUILDING GOL NEGAR V1.2.0"
+          echo "========================================"
 
           gradle clean assembleDebug \
             --no-daemon \
@@ -119,6 +161,7 @@ jobs:
           echo "========================================"
 
           if [ "$STATUS" -ne 0 ]; then
+
             echo ""
             echo "========================================"
             echo "KOTLIN / GRADLE ERRORS"
@@ -127,14 +170,15 @@ jobs:
             grep -n -E \
               '(^|[^A-Za-z])(e:|error:|ERROR|FAILURE:|Execution failed|Syntax error|Unresolved reference|CompilationErrorException|Caused by:)' \
               "$GITHUB_WORKSPACE/build.log" \
-              | tail -n 200 || true
+              | tail -n 250 \
+              || true
 
             echo ""
             echo "========================================"
-            echo "LAST 250 LINES OF BUILD LOG"
+            echo "LAST 300 LINES OF BUILD LOG"
             echo "========================================"
 
-            tail -n 250 "$GITHUB_WORKSPACE/build.log"
+            tail -n 300 "$GITHUB_WORKSPACE/build.log"
           fi
 
           exit "$STATUS"
@@ -143,7 +187,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gol-negar-build-log
+          name: gol-negar-v1.2.0-build-log
           path: build.log
           if-no-files-found: warn
 
@@ -155,15 +199,28 @@ jobs:
 
           mkdir -p "$GITHUB_WORKSPACE/apk_output"
 
-          cp "$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" \
-             "$GITHUB_WORKSPACE/apk_output/GolNegar-debug.apk"
+          APK_SOURCE="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
 
-          echo "APK created successfully:"
-          ls -lh "$GITHUB_WORKSPACE/apk_output/GolNegar-debug.apk"
+          if [ ! -f "$APK_SOURCE" ]; then
+            echo "ERROR: APK was not created."
+            exit 1
+          fi
+
+          cp "$APK_SOURCE" \
+            "$GITHUB_WORKSPACE/apk_output/GolNegar-v1.2.0-debug.apk"
+
+          echo ""
+          echo "========================================"
+          echo "APK CREATED SUCCESSFULLY"
+          echo "========================================"
+
+          ls -lh \
+            "$GITHUB_WORKSPACE/apk_output/GolNegar-v1.2.0-debug.apk"
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-APK
-          path: apk_output/GolNegar-debug.apk
+          name: GolNegar-v1.2.0-APK
+          path: apk_output/GolNegar-v1.2.0-debug.apk
+          if-no-files-found: error
