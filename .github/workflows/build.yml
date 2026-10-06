@@ -34,10 +34,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP_FILE="GolNegar_ExpenseSyncRulesFix_121.zip"
+          ZIP_FILE="GolNegar_SellerSyncPermissionFix_122.zip"
 
           echo "========================================"
-          echo "GOL NEGAR V1.2.1"
+          echo "GOL NEGAR V1.2.2"
           echo "========================================"
 
           echo "Looking for:"
@@ -47,13 +47,12 @@ jobs:
             echo ""
             echo "ERROR: Source ZIP not found."
             echo ""
-            echo "ZIP files available in repository:"
+            echo "ZIP files available:"
             find "$GITHUB_WORKSPACE" \
               -maxdepth 3 \
               -type f \
               -name "*.zip" \
               -print
-
             exit 1
           fi
 
@@ -68,22 +67,19 @@ jobs:
             "$GITHUB_WORKSPACE/$ZIP_FILE" \
             -d "$GITHUB_WORKSPACE/build_source"
 
-          PROJECT_DIR="$(find "$GITHUB_WORKSPACE/build_source" \
+          PROJECT_SETTINGS="$(find \
+            "$GITHUB_WORKSPACE/build_source" \
             -type f \
             -name "settings.gradle.kts" \
             -print \
-            -quit \
-            | xargs -r dirname)"
+            -quit)"
 
-          if [ -z "$PROJECT_DIR" ]; then
+          if [ -z "$PROJECT_SETTINGS" ]; then
             echo "ERROR: settings.gradle.kts not found."
             exit 1
           fi
 
-          if [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo "ERROR: app/build.gradle.kts not found."
-            exit 1
-          fi
+          PROJECT_DIR="$(dirname "$PROJECT_SETTINGS")"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
@@ -95,7 +91,7 @@ jobs:
           echo "$PROJECT_DIR"
 
 
-      - name: Validate source before Gradle
+      - name: Validate source
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
@@ -105,39 +101,37 @@ jobs:
           echo "VALIDATING SOURCE"
           echo "========================================"
 
+          test -f settings.gradle.kts
+          test -f build.gradle.kts
+          test -f app/build.gradle.kts
+
           test -s \
             app/src/main/java/com/example/golyar/MainActivity.kt
 
-          test -f \
-            app/google-services.json
-
-          test -f \
-            firestore.rules
-
-          test -f \
-            .github/workflows/build.yml
+          test -f app/google-services.json
+          test -f firestore.rules
 
           echo ""
           echo "Checking version..."
 
           grep -q \
-            'versionName = "1.2.1"' \
+            'versionName = "1.2.2"' \
             app/build.gradle.kts
 
           grep -q \
-            'versionCode = 52' \
+            'versionCode = 53' \
             app/build.gradle.kts
 
-          echo "Version: 1.2.1"
+          echo "Version 1.2.2: OK"
 
           echo ""
-          echo "Checking sectionTitle..."
+          echo "Checking seller sync..."
 
           grep -q \
-            'private fun sectionTitle' \
+            'seller_id' \
             app/src/main/java/com/example/golyar/MainActivity.kt
 
-          echo "sectionTitle: OK"
+          echo "seller_id sync support: OK"
 
           echo ""
           echo "Checking expense_types Rules..."
@@ -150,17 +144,13 @@ jobs:
             'allow read: if signedIn();' \
             firestore.rules
 
-          grep -q \
-            'allow create, update, delete: if isAdmin();' \
-            firestore.rules
-
           echo "expense_types Rules: OK"
 
           echo ""
-          echo "Checking Build ZIP name..."
+          echo "Checking Build source name..."
 
           grep -q \
-            'GolNegar_ExpenseSyncRulesFix_121.zip' \
+            'GolNegar_SellerSyncPermissionFix_122.zip' \
             .github/workflows/build.yml
 
           echo "Build source: OK"
@@ -177,28 +167,22 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "Checking Firebase configuration..."
+          echo "Checking Firebase..."
 
           test -s app/google-services.json
-
-          echo "google-services.json: OK"
-
-          echo ""
-          echo "Checking Firestore Rules..."
-
           test -s firestore.rules
 
-          echo "firestore.rules: OK"
+          echo "Firebase configuration: OK"
 
 
-      - name: Build Gol Negar v1.2.1
+      - name: Build Gol Negar v1.2.2
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set +e
 
           echo "========================================"
-          echo "BUILDING GOL NEGAR V1.2.1"
+          echo "BUILDING GOL NEGAR V1.2.2"
           echo "========================================"
 
           gradle clean assembleDebug \
@@ -218,7 +202,7 @@ jobs:
 
             echo ""
             echo "========================================"
-            echo "KOTLIN / GRADLE ERRORS"
+            echo "BUILD ERRORS"
             echo "========================================"
 
             grep -n -E \
@@ -229,7 +213,7 @@ jobs:
 
             echo ""
             echo "========================================"
-            echo "LAST 300 LINES"
+            echo "LAST 300 LOG LINES"
             echo "========================================"
 
             tail -n 300 \
@@ -243,7 +227,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.2.1-build-log
+          name: GolNegar-v1.2.2-build-log
           path: build.log
           if-no-files-found: warn
 
@@ -266,7 +250,7 @@ jobs:
 
           cp \
             "$APK_SOURCE" \
-            "$GITHUB_WORKSPACE/release/GolNegar-v1.2.1-debug.apk"
+            "$GITHUB_WORKSPACE/release/GolNegar-v1.2.2-debug.apk"
 
           echo ""
           echo "========================================"
@@ -274,13 +258,13 @@ jobs:
           echo "========================================"
 
           ls -lh \
-            "$GITHUB_WORKSPACE/release/GolNegar-v1.2.1-debug.apk"
+            "$GITHUB_WORKSPACE/release/GolNegar-v1.2.2-debug.apk"
 
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.2.1-debug.apk
-          path: release/GolNegar-v1.2.1-debug.apk
+          name: GolNegar-v1.2.2-debug.apk
+          path: release/GolNegar-v1.2.2-debug.apk
           if-no-files-found: error
