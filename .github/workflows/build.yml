@@ -9,12 +9,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -33,45 +31,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          ZIP_FILE="GolNegar_SellerFirebaseIdentityFix_123.zip"
+          ZIP_FILE="GolNegar_MultiUser_UIAndSyncFix_124.zip"
 
           echo "========================================"
-          echo "BUILDING GOL NEGAR V1.2.3"
+          echo "BUILDING GOL NEGAR V1.2.4"
           echo "========================================"
-
-          echo "Looking for:"
-          echo "$ZIP_FILE"
 
           if [ ! -f "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
-            echo "ERROR: Source ZIP not found."
-            echo ""
-            echo "ZIP files available:"
-            find "$GITHUB_WORKSPACE" \
-              -maxdepth 3 \
-              -type f \
-              -name "*.zip" \
-              -print
+            echo "ERROR: Source ZIP not found: $ZIP_FILE"
+            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -name '*.zip' -print
             exit 1
           fi
-
-          echo ""
-          echo "Source ZIP found:"
-          ls -lh "$GITHUB_WORKSPACE/$ZIP_FILE"
 
           rm -rf "$GITHUB_WORKSPACE/build_source"
           mkdir -p "$GITHUB_WORKSPACE/build_source"
 
-          unzip -q \
-            "$GITHUB_WORKSPACE/$ZIP_FILE" \
+          unzip -q "$GITHUB_WORKSPACE/$ZIP_FILE" \
             -d "$GITHUB_WORKSPACE/build_source"
 
-          PROJECT_SETTINGS="$(find \
-            "$GITHUB_WORKSPACE/build_source" \
-            -type f \
-            -name "settings.gradle.kts" \
-            -print \
-            -quit)"
+          PROJECT_SETTINGS="$(find "$GITHUB_WORKSPACE/build_source" \
+            -type f -name settings.gradle.kts -print -quit)"
 
           if [ -z "$PROJECT_SETTINGS" ]; then
             echo "ERROR: settings.gradle.kts not found."
@@ -81,11 +60,7 @@ jobs:
           PROJECT_DIR="$(dirname "$PROJECT_SETTINGS")"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo ""
-          echo "PROJECT DIRECTORY:"
-          echo "$PROJECT_DIR"
-
+          echo "PROJECT_DIR=$PROJECT_DIR"
 
       - name: Validate source
         working-directory: ${{ env.PROJECT_DIR }}
@@ -93,150 +68,87 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "========================================"
-          echo "VALIDATING SOURCE"
-          echo "========================================"
-
           test -f settings.gradle.kts
           test -f build.gradle.kts
           test -f app/build.gradle.kts
           test -f app/google-services.json
           test -f firestore.rules
+          test -f app/src/main/java/com/example/golyar/MainActivity.kt
+          test -f app/src/main/res/drawable/ic_bouquet.png
 
-          test -s \
-            app/src/main/java/com/example/golyar/MainActivity.kt
+          grep -q 'versionName = "1.2.4"' app/build.gradle.kts
+          grep -q 'versionCode = 55' app/build.gradle.kts
 
-          echo "Project files: OK"
+          echo "Checking back-stack navigation..."
+          grep -q 'screenBackStack' app/src/main/java/com/example/golyar/MainActivity.kt
+          grep -q 'OnBackPressedCallback' app/src/main/java/com/example/golyar/MainActivity.kt
 
-          echo ""
-          echo "Checking version..."
+          echo "Checking seller payment identity..."
+          grep -q '"payments" to rows' app/src/main/java/com/example/golyar/MainActivity.kt
+          grep -q 'seller_remote_id.*getString(8)' app/src/main/java/com/example/golyar/MainActivity.kt
+          grep -q 'data\["auth_uid"\]' app/src/main/java/com/example/golyar/MainActivity.kt
 
-          grep -q \
-            'versionName = "1.2.3"' \
-            app/build.gradle.kts
+          echo "Checking multi-user support..."
+          grep -q 'GREENHOUSE:STAFF:' app/src/main/java/com/example/golyar/MainActivity.kt
+          grep -q 'showGreenhouseUsers' app/src/main/java/com/example/golyar/MainActivity.kt
+          grep -q 'role.*STAFF' firestore.rules
+          grep -q 'function isGreenhouseUser' firestore.rules
 
-          grep -q \
-            'versionCode = 54' \
-            app/build.gradle.kts
+          echo "Checking expense/miscellaneous data..."
+          grep -q 'misc_sales' app/src/main/java/com/example/golyar/MainActivity.kt
+          grep -q 'greenhouse_payments' app/src/main/java/com/example/golyar/MainActivity.kt
+          grep -q 'expense_types' app/src/main/java/com/example/golyar/MainActivity.kt
 
-          echo "Version 1.2.3: OK"
+          echo "Checking Firebase payment Rules..."
+          grep -q 'match /payments/{id}' firestore.rules
+          grep -q 'request.resource.data.auth_uid == request.auth.uid' firestore.rules
 
-          echo ""
-          echo "Checking seller identity..."
+          echo "Source validation PASSED."
 
-          grep -q \
-            'seller_id' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "seller_id support: OK"
-
-          echo ""
-          echo "Checking expense_types Rules..."
-
-          grep -q \
-            'match /expense_types/{id}' \
-            firestore.rules
-
-          grep -q \
-            'allow read: if signedIn();' \
-            firestore.rules
-
-          echo "expense_types Rules: OK"
-
-          echo ""
-          echo "Checking payment Rules..."
-
-          grep -q \
-            'match /payments/{id}' \
-            firestore.rules
-
-          echo "payments Rules: OK"
-
-          echo ""
-          echo "Checking correct ZIP..."
-
-          grep -q \
-            'GolNegar_SellerFirebaseIdentityFix_123.zip' \
-            .github/workflows/build.yml
-
-          echo "Build source: OK"
-
-          echo ""
-          echo "========================================"
-          echo "SOURCE VALIDATION PASSED"
-          echo "========================================"
-
-
-      - name: Verify Firebase configuration
+      - name: Run smoke tests
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set -euo pipefail
+          python smoke_test.py
 
-          echo "Checking Firebase configuration..."
-
-          test -s app/google-services.json
-          test -s firestore.rules
-
-          echo "Firebase configuration: OK"
-
-
-      - name: Build Gol Negar v1.2.3
+      - name: Build Gol Negar v1.2.4
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set +e
 
-          echo "========================================"
-          echo "BUILDING GOL NEGAR V1.2.3"
-          echo "========================================"
-
           gradle clean assembleDebug \
             --no-daemon \
             --stacktrace \
-            --info \
-            2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+            --info 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
 
           STATUS=${PIPESTATUS[0]}
 
-          echo ""
-          echo "========================================"
           echo "GRADLE EXIT CODE: $STATUS"
-          echo "========================================"
 
           if [ "$STATUS" -ne 0 ]; then
-
-            echo ""
-            echo "========================================"
-            echo "BUILD ERRORS"
-            echo "========================================"
+            echo "================ BUILD ERRORS ================"
 
             grep -n -E \
               '(^|[^A-Za-z])(e:|error:|ERROR|FAILURE:|Execution failed|Syntax error|Unresolved reference|CompilationErrorException|Caused by:)' \
               "$GITHUB_WORKSPACE/build.log" \
-              | tail -n 250 \
-              || true
+              | tail -n 250 || true
 
-            echo ""
-            echo "========================================"
-            echo "LAST 300 LOG LINES"
-            echo "========================================"
+            echo "================ LAST LOG LINES ================"
 
-            tail -n 300 \
-              "$GITHUB_WORKSPACE/build.log"
+            tail -n 300 "$GITHUB_WORKSPACE/build.log"
           fi
 
           exit "$STATUS"
-
 
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.2.3-build-log
+          name: GolNegar-v1.2.4-build-log
           path: build.log
           if-no-files-found: warn
-
 
       - name: Prepare APK
         if: success()
@@ -247,30 +159,20 @@ jobs:
 
           APK_SOURCE="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
 
-          if [ ! -f "$APK_SOURCE" ]; then
-            echo "ERROR: APK was not created."
-            exit 1
-          fi
+          test -f "$APK_SOURCE"
 
           mkdir -p "$GITHUB_WORKSPACE/release"
 
-          cp \
-            "$APK_SOURCE" \
-            "$GITHUB_WORKSPACE/release/GolNegar-v1.2.3-debug.apk"
-
-          echo ""
-          echo "========================================"
-          echo "APK CREATED SUCCESSFULLY"
-          echo "========================================"
+          cp "$APK_SOURCE" \
+            "$GITHUB_WORKSPACE/release/GolNegar-v1.2.4-debug.apk"
 
           ls -lh \
-            "$GITHUB_WORKSPACE/release/GolNegar-v1.2.3-debug.apk"
-
+            "$GITHUB_WORKSPACE/release/GolNegar-v1.2.4-debug.apk"
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.2.3-debug.apk
-          path: release/GolNegar-v1.2.3-debug.apk
+          name: GolNegar-v1.2.4-debug.apk
+          path: release/GolNegar-v1.2.4-debug.apk
           if-no-files-found: error
