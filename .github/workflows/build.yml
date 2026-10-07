@@ -177,20 +177,30 @@ jobs:
             'sellerSharePercent/100.0' \
             app/src/main/java/com/example/golyar/MainActivity.kt
 
-          echo "Checking removed invalid field..."
+          echo "Checking removed invalid sellerShareAmount calculation..."
 
           if grep -q \
-            'sellerShareAmount' \
+            'saleRows.*sellerShareAmount' \
             app/src/main/java/com/example/golyar/MainActivity.kt; then
 
-            echo "ERROR: Invalid sellerShareAmount reference still exists."
+            echo "ERROR: Invalid sellerShareAmount calculation still exists."
 
-            grep -n \
-              'sellerShareAmount' \
+            grep -n -E \
+              'saleRows.*sellerShareAmount' \
               app/src/main/java/com/example/golyar/MainActivity.kt
 
             exit 1
           fi
+
+          echo "Valid DetailedSaleRow sellerShareAmount references are allowed."
+
+          grep -q \
+            'data class DetailedSaleRow' \
+            app/src/main/java/com/example/golyar/MainActivity.kt
+
+          grep -q \
+            'sellerShareAmount:Long' \
+            app/src/main/java/com/example/golyar/MainActivity.kt
 
           echo "Checking Firebase miscellaneous sales..."
 
