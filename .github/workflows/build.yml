@@ -14,7 +14,6 @@ jobs:
       contents: read
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -29,22 +28,22 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Locate exact Gol Negar v1.3.5 source
+      - name: Locate exact Gol Negar v1.3.6 source
         shell: bash
         run: |
           set -euo pipefail
 
-          ZIP_FILE="GolNegar_FullAuditFix_v1.3.5_RebuiltLedgerPages.zip"
+          ZIP_FILE="GolNegar_FullAuditFix_v1.3.6_StableLedger.zip"
 
           echo "========================================"
-          echo "BUILDING GOL NEGAR V1.3.5"
+          echo "BUILDING GOL NEGAR V1.3.6"
           echo "========================================"
           echo "Required source:"
           echo "$ZIP_FILE"
           echo ""
 
           if [ ! -f "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
-            echo "ERROR: Required v1.3.5 ZIP was NOT found."
+            echo "ERROR: Required v1.3.6 ZIP was NOT found."
             echo ""
             echo "ZIP files currently in repository:"
             find "$GITHUB_WORKSPACE" \
@@ -54,24 +53,15 @@ jobs:
             exit 1
           fi
 
-          echo "FOUND EXACT V1.3.5 SOURCE:"
+          echo "FOUND EXACT V1.3.6 SOURCE:"
           ls -lh "$GITHUB_WORKSPACE/$ZIP_FILE"
 
           rm -rf "$GITHUB_WORKSPACE/build_source"
-
           mkdir -p "$GITHUB_WORKSPACE/build_source"
 
           unzip -q \
             "$GITHUB_WORKSPACE/$ZIP_FILE" \
             -d "$GITHUB_WORKSPACE/build_source"
-
-          echo ""
-          echo "Extracted source tree:"
-          find "$GITHUB_WORKSPACE/build_source" \
-            -maxdepth 3 \
-            -type f \
-            | sort \
-            | head -200
 
           PROJECT_SETTINGS="$(
             find "$GITHUB_WORKSPACE/build_source" \
@@ -87,41 +77,68 @@ jobs:
 
           PROJECT_DIR="$(dirname "$PROJECT_SETTINGS")"
 
-          echo ""
           echo "PROJECT_DIR=$PROJECT_DIR"
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Verify this is REALLY v1.3.5
+      - name: Verify exact source version
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set -euo pipefail
 
           echo "========================================"
-          echo "VERIFYING SOURCE VERSION"
+          echo "VERIFYING GOL NEGAR V1.3.6"
           echo "========================================"
 
           test -f app/build.gradle.kts
           test -f app/src/main/java/com/example/golyar/MainActivity.kt
 
           echo ""
-          echo "Checking Gradle version..."
-          grep -n 'versionName' app/build.gradle.kts
-          grep -n 'versionCode' app/build.gradle.kts
+          echo "Gradle version declarations:"
+          grep -n "versionName" app/build.gradle.kts
+          grep -n "versionCode" app/build.gradle.kts
 
-          grep -q 'versionName = "1.3.5"' app/build.gradle.kts
-          grep -q 'versionCode = 65' app/build.gradle.kts
-
-          echo "Version check PASSED."
+          grep -q 'versionName = "1.3.6"' app/build.gradle.kts
+          grep -q 'versionCode = 66' app/build.gradle.kts
 
           echo ""
-          echo "Checking rebuilt ledger pages..."
+          echo "VERSION CHECK PASSED."
+
+          echo ""
+          echo "Checking required database tables..."
+
+          grep -q 'misc_sales' \
+            app/src/main/java/com/example/golyar/MainActivity.kt
+
+          grep -q 'greenhouse_payments' \
+            app/src/main/java/com/example/golyar/MainActivity.kt
+
+          echo "DATABASE CHECK PASSED."
+
+          echo ""
+          echo "Checking miscellaneous sales..."
+
+          grep -q 'fun addMiscSale' \
+            app/src/main/java/com/example/golyar/MainActivity.kt
+
+          grep -q 'fun miscSales' \
+            app/src/main/java/com/example/golyar/MainActivity.kt
 
           grep -q 'showMiscSale' \
             app/src/main/java/com/example/golyar/MainActivity.kt
 
           grep -q 'showMiscSalesHistory' \
+            app/src/main/java/com/example/golyar/MainActivity.kt
+
+          echo "MISC SALES CHECK PASSED."
+
+          echo ""
+          echo "Checking greenhouse expenses..."
+
+          grep -q 'fun addGreenhouseExpense' \
+            app/src/main/java/com/example/golyar/MainActivity.kt
+
+          grep -q 'fun greenhousePayments' \
             app/src/main/java/com/example/golyar/MainActivity.kt
 
           grep -q 'showGreenhouseExpense' \
@@ -130,32 +147,12 @@ jobs:
           grep -q 'showGreenhousePaymentsHistory' \
             app/src/main/java/com/example/golyar/MainActivity.kt
 
+          echo "GREENHOUSE EXPENSE CHECK PASSED."
+
+          echo ""
+          echo "Checking financial report..."
+
           grep -q 'showFinancialReport' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "Ledger page check PASSED."
-
-          echo ""
-          echo "Checking local SQLite writes..."
-
-          grep -q 'insertOrThrow' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'misc_sales' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'greenhouse_payments' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "SQLite write check PASSED."
-
-          echo ""
-          echo "Checking local-first financial report..."
-
-          grep -q 'miscSales()' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'greenhousePayments()' \
             app/src/main/java/com/example/golyar/MainActivity.kt
 
           grep -q 'miscTotal' \
@@ -164,7 +161,7 @@ jobs:
           grep -q 'expenseTotal' \
             app/src/main/java/com/example/golyar/MainActivity.kt
 
-          echo "Report check PASSED."
+          echo "FINANCIAL REPORT CHECK PASSED."
 
           echo ""
           echo "Checking Firebase collections..."
@@ -175,11 +172,11 @@ jobs:
           grep -q '"greenhouse_payments"' \
             app/src/main/java/com/example/golyar/MainActivity.kt
 
-          echo "Firebase collection check PASSED."
+          echo "FIREBASE CHECK PASSED."
 
           echo ""
           echo "========================================"
-          echo "V1.3.5 SOURCE VERIFIED SUCCESSFULLY"
+          echo "V1.3.6 SOURCE VERIFIED"
           echo "========================================"
 
       - name: Run smoke tests
@@ -188,21 +185,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "Running project smoke tests..."
+          echo "Running smoke tests..."
 
           python smoke_test.py
 
           echo ""
-          echo "Smoke tests PASSED."
+          echo "SMOKE TESTS PASSED."
 
-      - name: Build Gol Negar v1.3.5
+      - name: Build Gol Negar v1.3.6
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set +e
 
           echo "========================================"
-          echo "GRADLE BUILD — GOL NEGAR V1.3.5"
+          echo "GRADLE BUILD — GOL NEGAR V1.3.6"
           echo "========================================"
 
           gradle clean assembleDebug \
@@ -224,16 +221,16 @@ jobs:
             echo "========================================"
 
             echo ""
-            echo "Important errors:"
+            echo "KOTLIN / GRADLE ERRORS:"
 
             grep -n -E \
-              '(^|[^A-Za-z])(e:|error:|ERROR|FAILURE:|Execution failed|Unresolved reference|CompilationErrorException|Caused by:)' \
+              '(^|[^A-Za-z])(e:|error:|ERROR|FAILURE:|Execution failed|Unresolved reference|Type mismatch|CompilationErrorException|Caused by:)' \
               "$GITHUB_WORKSPACE/build.log" \
               | tail -300 \
               || true
 
             echo ""
-            echo "Last 350 log lines:"
+            echo "LAST 350 LOG LINES:"
 
             tail -350 "$GITHUB_WORKSPACE/build.log"
 
@@ -241,14 +238,14 @@ jobs:
 
             echo ""
             echo "========================================"
-            echo "BUILD SUCCESSFUL — V1.3.5"
+            echo "BUILD SUCCESSFUL — GOL NEGAR V1.3.6"
             echo "========================================"
 
           fi
 
           exit "$STATUS"
 
-      - name: Verify APK
+      - name: Verify generated APK
         if: success()
         shell: bash
         run: |
@@ -272,18 +269,18 @@ jobs:
 
           cp \
             "$APK_SOURCE" \
-            "$GITHUB_WORKSPACE/release/GolNegar-v1.3.5-debug.apk"
+            "$GITHUB_WORKSPACE/release/GolNegar-v1.3.6-debug.apk"
 
           echo ""
-          echo "Final APK:"
+          echo "FINAL APK:"
           ls -lh \
-            "$GITHUB_WORKSPACE/release/GolNegar-v1.3.5-debug.apk"
+            "$GITHUB_WORKSPACE/release/GolNegar-v1.3.6-debug.apk"
 
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.3.5-build-log
+          name: GolNegar-v1.3.6-build-log
           path: build.log
           if-no-files-found: warn
 
@@ -291,6 +288,6 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.3.5-debug
-          path: release/GolNegar-v1.3.5-debug.apk
+          name: GolNegar-v1.3.6-debug
+          path: release/GolNegar-v1.3.6-debug.apk
           if-no-files-found: error
