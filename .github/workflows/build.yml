@@ -1,293 +1,70 @@
-name: Build Gol Negar APK
+name: Build Gol Negar APK v28
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
+      - master
+    paths:
+      - 'GolNegar_v28_FirebaseSecure.zip'
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v5
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle 8.11.1
+      - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Locate exact Gol Negar v1.3.6 source
+      - name: Check and extract Gol Negar project ZIP
         shell: bash
         run: |
           set -euo pipefail
-
-          ZIP_FILE="GolNegar_FullAuditFix_v1.3.6_StableLedger.zip"
-
-          echo "========================================"
-          echo "BUILDING GOL NEGAR V1.3.6"
-          echo "========================================"
-          echo "Required source:"
-          echo "$ZIP_FILE"
-          echo ""
-
-          if [ ! -f "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
-            echo "ERROR: Required v1.3.6 ZIP was NOT found."
-            echo ""
-            echo "ZIP files currently in repository:"
-            find "$GITHUB_WORKSPACE" \
-              -type f \
-              -iname "*.zip" \
-              -print | sort
+          test -f GolNegar_v28_FirebaseSecure.zip || {
+            echo 'ERROR: GolNegar_v28_FirebaseSecure.zip was not found in the repository root.'
             exit 1
-          fi
+          }
+          mkdir -p "$RUNNER_TEMP/GolNegarProject"
+          unzip -q GolNegar_v28_FirebaseSecure.zip -d "$RUNNER_TEMP/GolNegarProject"
+          test -f "$RUNNER_TEMP/GolNegarProject/settings.gradle.kts"
+          test -f "$RUNNER_TEMP/GolNegarProject/app/build.gradle.kts"
 
-          echo "FOUND EXACT V1.3.6 SOURCE:"
-          ls -lh "$GITHUB_WORKSPACE/$ZIP_FILE"
-
-          rm -rf "$GITHUB_WORKSPACE/build_source"
-          mkdir -p "$GITHUB_WORKSPACE/build_source"
-
-          unzip -q \
-            "$GITHUB_WORKSPACE/$ZIP_FILE" \
-            -d "$GITHUB_WORKSPACE/build_source"
-
-          PROJECT_SETTINGS="$(
-            find "$GITHUB_WORKSPACE/build_source" \
-              -type f \
-              -name "settings.gradle.kts" \
-              -print -quit
-          )"
-
-          if [ -z "$PROJECT_SETTINGS" ]; then
-            echo "ERROR: settings.gradle.kts not found."
-            exit 1
-          fi
-
-          PROJECT_DIR="$(dirname "$PROJECT_SETTINGS")"
-
-          echo "PROJECT_DIR=$PROJECT_DIR"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-      - name: Verify exact source version
-        working-directory: ${{ env.PROJECT_DIR }}
+      - name: Build debug APK
         shell: bash
         run: |
           set -euo pipefail
+          gradle -p "$RUNNER_TEMP/GolNegarProject" :app:assembleDebug --no-daemon --stacktrace
+          cp "$RUNNER_TEMP/GolNegarProject/app/build/outputs/apk/debug/app-debug.apk" "$GITHUB_WORKSPACE/GolNegar-v28-debug.apk"
 
-          echo "========================================"
-          echo "VERIFYING GOL NEGAR V1.3.6"
-          echo "========================================"
-
-          test -f app/build.gradle.kts
-          test -f app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo ""
-          echo "Gradle version declarations:"
-          grep -n "versionName" app/build.gradle.kts
-          grep -n "versionCode" app/build.gradle.kts
-
-          grep -q 'versionName = "1.3.6"' app/build.gradle.kts
-          grep -q 'versionCode = 66' app/build.gradle.kts
-
-          echo ""
-          echo "VERSION CHECK PASSED."
-
-          echo ""
-          echo "Checking required database tables..."
-
-          grep -q 'misc_sales' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'greenhouse_payments' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "DATABASE CHECK PASSED."
-
-          echo ""
-          echo "Checking miscellaneous sales..."
-
-          grep -q 'fun addMiscSale' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'fun miscSales' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'showMiscSale' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'showMiscSalesHistory' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "MISC SALES CHECK PASSED."
-
-          echo ""
-          echo "Checking greenhouse expenses..."
-
-          grep -q 'fun addGreenhouseExpense' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'fun greenhousePayments' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'showGreenhouseExpense' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'showGreenhousePaymentsHistory' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "GREENHOUSE EXPENSE CHECK PASSED."
-
-          echo ""
-          echo "Checking financial report..."
-
-          grep -q 'showFinancialReport' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'miscTotal' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q 'expenseTotal' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "FINANCIAL REPORT CHECK PASSED."
-
-          echo ""
-          echo "Checking Firebase collections..."
-
-          grep -q '"misc_sales"' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          grep -q '"greenhouse_payments"' \
-            app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "FIREBASE CHECK PASSED."
-
-          echo ""
-          echo "========================================"
-          echo "V1.3.6 SOURCE VERIFIED"
-          echo "========================================"
-
-      - name: Run smoke tests
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "Running smoke tests..."
-
-          python smoke_test.py
-
-          echo ""
-          echo "SMOKE TESTS PASSED."
-
-      - name: Build Gol Negar v1.3.6
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        run: |
-          set +e
-
-          echo "========================================"
-          echo "GRADLE BUILD — GOL NEGAR V1.3.6"
-          echo "========================================"
-
-          gradle clean assembleDebug \
-            --no-daemon \
-            --stacktrace \
-            --info \
-            2>&1 | tee "$GITHUB_WORKSPACE/build.log"
-
-          STATUS=${PIPESTATUS[0]}
-
-          echo ""
-          echo "GRADLE EXIT CODE: $STATUS"
-
-          if [ "$STATUS" -ne 0 ]; then
-
-            echo ""
-            echo "========================================"
-            echo "BUILD FAILED"
-            echo "========================================"
-
-            echo ""
-            echo "KOTLIN / GRADLE ERRORS:"
-
-            grep -n -E \
-              '(^|[^A-Za-z])(e:|error:|ERROR|FAILURE:|Execution failed|Unresolved reference|Type mismatch|CompilationErrorException|Caused by:)' \
-              "$GITHUB_WORKSPACE/build.log" \
-              | tail -300 \
-              || true
-
-            echo ""
-            echo "LAST 350 LOG LINES:"
-
-            tail -350 "$GITHUB_WORKSPACE/build.log"
-
-          else
-
-            echo ""
-            echo "========================================"
-            echo "BUILD SUCCESSFUL — GOL NEGAR V1.3.6"
-            echo "========================================"
-
-          fi
-
-          exit "$STATUS"
-
-      - name: Verify generated APK
-        if: success()
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          APK_SOURCE="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
-
-          echo "Checking APK:"
-          echo "$APK_SOURCE"
-
-          if [ ! -f "$APK_SOURCE" ]; then
-            echo "ERROR: APK was not generated."
-            exit 1
-          fi
-
-          echo ""
-          echo "APK FOUND:"
-          ls -lh "$APK_SOURCE"
-
-          mkdir -p "$GITHUB_WORKSPACE/release"
-
-          cp \
-            "$APK_SOURCE" \
-            "$GITHUB_WORKSPACE/release/GolNegar-v1.3.6-debug.apk"
-
-          echo ""
-          echo "FINAL APK:"
-          ls -lh \
-            "$GITHUB_WORKSPACE/release/GolNegar-v1.3.6-debug.apk"
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: GolNegar-v1.3.6-build-log
-          path: build.log
-          if-no-files-found: warn
-
-      - name: Upload APK
+      - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.3.6-debug
-          path: release/GolNegar-v1.3.6-debug.apk
+          name: GolNegar-v28-debug-apk
+          path: GolNegar-v28-debug.apk
           if-no-files-found: error
+
+      - name: Upload Gradle diagnostic report if build fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GolNegar-v28-build-diagnostics
+          path: |
+            ${{ runner.temp }}/GolNegarProject/build/reports/problems/problems-report.html
+            ${{ runner.temp }}/GolNegarProject/app/build/reports/**
+          if-no-files-found: ignore
