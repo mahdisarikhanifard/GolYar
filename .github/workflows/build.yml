@@ -110,7 +110,7 @@ jobs:
           echo "Checking Firebase pull for both collections..."
           grep -q '"misc_sales", "greenhouse_payments"' app/src/main/java/com/example/golyar/MainActivity.kt
           grep -q 'whereEqualTo("seller_remote_id", sellerRemoteId)' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'FirebaseFirestore.getInstance(secondaryApp).collection("users")' app/src/main/java/com/example/golyar/MainActivity.kt
+          grep -q 'fs.collection("users")' app/src/main/java/com/example/golyar/MainActivity.kt
 
           echo "Source validation PASSED."
 
@@ -121,7 +121,7 @@ jobs:
           set -euo pipefail
           python smoke_test.py
 
-      - name: Build Gol Negar v1.3.7
+      - name: Build Gol Negar v1.3.9
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
@@ -143,7 +143,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.3.7-build-log
+          name: GolNegar-v1.3.9-build-log
           path: build.log
           if-no-files-found: warn
 
@@ -156,13 +156,13 @@ jobs:
           test -f "$APK_SOURCE"
 
           mkdir -p "$GITHUB_WORKSPACE/release"
-          cp "$APK_SOURCE" "$GITHUB_WORKSPACE/release/GolNegar-v1.3.7-debug.apk"
-          ls -lh "$GITHUB_WORKSPACE/release/GolNegar-v1.3.7-debug.apk"
+          cp "$APK_SOURCE" "$GITHUB_WORKSPACE/release/GolNegar-v1.3.9-debug.apk"
+          ls -lh "$GITHUB_WORKSPACE/release/GolNegar-v1.3.9-debug.apk"
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.3.7-debug.apk
-          path: release/GolNegar-v1.3.7-debug.apk
+          name: GolNegar-v1.3.9-debug.apk
+          path: release/GolNegar-v1.3.9-debug.apk
           if-no-files-found: error
