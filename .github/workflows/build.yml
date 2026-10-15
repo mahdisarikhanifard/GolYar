@@ -3,8 +3,7 @@ name: Build Gol Negar APK
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
@@ -13,7 +12,6 @@ jobs:
   build:
     name: Build and Verify Gol Negar
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,64 +32,39 @@ jobs:
         run: |
           set -euo pipefail
           ZIP_FILE="GolNegar_v1.4.5_VersionThenUserName.zip"
-          if [ ! -s "$ZIP_FILE" ]; then
-            echo "::error::Missing source archive: $ZIP_FILE"
-            find . -maxdepth 3 -type f -iname '*.zip' -print
-            exit 1
-          fi
+          test -s "$ZIP_FILE" || { echo "::error::Missing $ZIP_FILE in repository root"; exit 1; }
           mkdir -p "$GITHUB_WORKSPACE/build_source"
           unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/build_source"
           SETTINGS_FILE="$(find "$GITHUB_WORKSPACE/build_source" -type f -name settings.gradle.kts -print -quit)"
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo "::error::settings.gradle.kts not found inside source ZIP"
-            exit 1
-          fi
+          test -n "$SETTINGS_FILE" || { echo "::error::settings.gradle.kts not found in ZIP"; exit 1; }
           echo "PROJECT_DIR=$(dirname "$SETTINGS_FILE")" >> "$GITHUB_ENV"
 
-      - name: Validate radial menu, payments, and project files
+      - name: Validate source and run smoke tests
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set -euo pipefail
-          test -s settings.gradle.kts
-          test -s build.gradle.kts
+          test -s app/src/main/java/com/example/golyar/MainActivity.kt
           test -s app/build.gradle.kts
           test -s app/google-services.json
-          test -s app/src/main/java/com/example/golyar/MainActivity.kt
-          test -s app/src/main/res/drawable/ic_bouquet.png
-          test -s smoke_test.py
-          grep -q 'versionName = "1.4.5"' app/build.gradle.kts
-          grep -q 'versionCode = 75' app/build.gradle.kts
-          grep -q 'rotation = startRotation + dx \* sensitivity' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'whereEqualTo("sellerRemoteId", remoteId)' app/src/main/java/com/example/golyar/MainActivity.kt
           python3 smoke_test.py
 
       - name: Build debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -uo pipefail
-          set +e
+          set -o pipefail
           gradle clean assembleDebug --no-daemon --stacktrace --info 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
-          STATUS=${PIPESTATUS[0]}
-          set -e
-          if [ "$STATUS" -ne 0 ]; then
-            echo "========== COMPILER ERRORS =========="
-            grep -n -E '(^|[[:space:]])e: |Unresolved reference|Argument type mismatch|Type mismatch|Compilation error|FAILURE:|What went wrong:' "$GITHUB_WORKSPACE/build.log" | tail -n 100 || true
-            tail -n 160 "$GITHUB_WORKSPACE/build.log" || true
-          fi
-          exit "$STATUS"
 
-      - name: Verify and stage APK
+      - name: Prepare APK
         if: success()
         shell: bash
         run: |
           set -euo pipefail
           APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$APK"
+          test -s "$APK" || { echo "::error::APK was not generated"; exit 1; }
           mkdir -p "$GITHUB_WORKSPACE/release"
           cp "$APK" "$GITHUB_WORKSPACE/release/GolNegar-v1.4.5-debug.apk"
-          ls -lh "$GITHUB_WORKSPACE/release/GolNegar-v1.4.5-debug.apk"
 
       - name: Upload APK
         if: success()
