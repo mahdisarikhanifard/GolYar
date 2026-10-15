@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="GolNegar_v1.5.2_Source.zip"
+          ZIP_FILE="GolNegar_v1.5.3_Source.zip"
           if [ ! -s "$ZIP_FILE" ]; then
             echo "::error::Missing source archive: $ZIP_FILE"
             find . -maxdepth 3 -type f -iname '*.zip' -print
@@ -58,10 +58,10 @@ jobs:
           test -s app/build.gradle.kts
           test -s app/google-services.json
           test -s app/src/main/java/com/example/golyar/MainActivity.kt
-          test -s app/src/main/res/drawable/ic_bouquet.png
+          test -s app/src/main/res/drawable/ic_rose.xml
           test -s smoke_test.py
-          grep -q 'versionName = "1.5.2"' app/build.gradle.kts
-          grep -q 'versionCode = 82' app/build.gradle.kts
+          grep -q 'versionName = "1.5.3"' app/build.gradle.kts
+          grep -q 'versionCode = 83' app/build.gradle.kts
           python3 smoke_test.py
 
       - name: Build debug APK and capture log
@@ -88,15 +88,15 @@ jobs:
           APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           mkdir -p "$GITHUB_WORKSPACE/release"
-          cp "$APK" "$GITHUB_WORKSPACE/release/GolNegar-v1.5.2-debug.apk"
-          ls -lh "$GITHUB_WORKSPACE/release/GolNegar-v1.5.2-debug.apk"
+          cp "$APK" "$GITHUB_WORKSPACE/release/GolNegar-v1.5.3-debug.apk"
+          ls -lh "$GITHUB_WORKSPACE/release/GolNegar-v1.5.3-debug.apk"
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.5.2-debug
-          path: release/GolNegar-v1.5.2-debug.apk
+          name: GolNegar-v1.5.3-debug
+          path: release/GolNegar-v1.5.3-debug.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -104,7 +104,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.5.2-build-log
+          name: GolNegar-v1.5.3-build-log
           path: build.log
           if-no-files-found: warn
           retention-days: 14
