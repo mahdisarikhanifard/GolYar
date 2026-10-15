@@ -61,7 +61,7 @@ jobs:
           test -s app/src/main/res/drawable/ic_bouquet.png
           test -s smoke_test.py
           grep -q 'versionName = "1.5.1"' app/build.gradle.kts
-          grep -q 'versionCode = 79' app/build.gradle.kts
+          grep -q 'versionCode = 81' app/build.gradle.kts
           python3 smoke_test.py
 
       - name: Build debug APK and capture log
