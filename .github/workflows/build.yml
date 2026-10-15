@@ -3,7 +3,8 @@ name: Build Gol Negar APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -12,6 +13,7 @@ jobs:
   build:
     name: Build and Verify Gol Negar
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,11 +34,18 @@ jobs:
         run: |
           set -euo pipefail
           ZIP_FILE="GolNegar_v1.4.7_Source.zip"
-          test -s "$ZIP_FILE" || { echo "::error::Missing source archive: $ZIP_FILE"; find . -maxdepth 3 -type f -iname '*.zip' -print; exit 1; }
+          if [ ! -s "$ZIP_FILE" ]; then
+            echo "::error::Missing source archive: $ZIP_FILE"
+            find . -maxdepth 3 -type f -iname '*.zip' -print
+            exit 1
+          fi
           mkdir -p "$GITHUB_WORKSPACE/build_source"
           unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/build_source"
           SETTINGS_FILE="$(find "$GITHUB_WORKSPACE/build_source" -type f -name settings.gradle.kts -print -quit)"
-          test -n "$SETTINGS_FILE" || { echo "::error::settings.gradle.kts not found inside source ZIP"; exit 1; }
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "::error::settings.gradle.kts not found inside source ZIP"
+            exit 1
+          fi
           echo "PROJECT_DIR=$(dirname "$SETTINGS_FILE")" >> "$GITHUB_ENV"
 
       - name: Validate project and run smoke tests
