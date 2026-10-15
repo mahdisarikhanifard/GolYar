@@ -6,12 +6,13 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
+    name: Build and Verify Gol Negar
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
 
     steps:
       - name: Checkout repository
@@ -22,13 +23,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
-      - name: Setup Gradle 8.11.1
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Extract source ZIP
+      - name: Extract project source
         shell: bash
         run: |
           set -euo pipefail
@@ -36,21 +38,26 @@ jobs:
           ZIP_FILE="GolNegar_v1.4.5_VersionThenUserName.zip"
 
           if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: Source ZIP not found: $ZIP_FILE"
-            echo "ZIP files in repository:"
-            find . -maxdepth 3 -type f -iname '*.zip'
+            echo "::error::Source ZIP not found: $ZIP_FILE"
+            echo "ZIP files available in repository:"
+            find . -maxdepth 3 -type f -iname '*.zip' -print
             exit 1
           fi
 
           mkdir -p "$GITHUB_WORKSPACE/build_source"
 
-          unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/build_source"
+          unzip -q "$ZIP_FILE" \
+            -d "$GITHUB_WORKSPACE/build_source"
 
-          SETTINGS_FILE="$(find "$GITHUB_WORKSPACE/build_source" \
-            -type f -name settings.gradle.kts -print -quit)"
+          SETTINGS_FILE="$(
+            find "$GITHUB_WORKSPACE/build_source" \
+              -type f \
+              -name settings.gradle.kts \
+              -print -quit
+          )"
 
           if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: settings.gradle.kts not found in ZIP"
+            echo "::error::settings.gradle.kts was not found."
             exit 1
           fi
 
@@ -58,46 +65,123 @@ jobs:
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          echo "Project directory: $PROJECT_DIR"
+          echo "Project directory:"
+          echo "$PROJECT_DIR"
 
-      - name: Validate source
+      - name: Validate project files
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set -euo pipefail
 
-          test -f settings.gradle.kts
-          test -f build.gradle.kts
-          test -f app/build.gradle.kts
-          test -f app/google-services.json
-          test -f smoke_test.py
+          test -s settings.gradle.kts
+          test -s build.gradle.kts
+          test -s app/build.gradle.kts
+          test -s app/google-services.json
           test -s app/src/main/java/com/example/golyar/MainActivity.kt
+          test -s smoke_test.py
 
-          echo "Checking application version..."
+          grep -q 'versionName = "1.4.5"' \
+            app/build.gradle.kts
 
-          grep -q 'versionName = "1.4.5"' app/build.gradle.kts
-          grep -q 'versionCode = 75' app/build.gradle.kts
+          grep -q 'versionCode = 75' \
+            app/build.gradle.kts
 
-          echo "Source validation passed."
+          echo "Project files validated."
 
-      - name: Run smoke tests
+      - name: Verify Kotlin carousel fix
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set -euo pipefail
+
+          FILE="app/src/main/java/com/example/golyar/MainActivity.kt"
+
+          grep -Fq \
+            'val spacing: Float = if (circles.size <= 1) 0f else usableHeight.toFloat() / (circles.size - 1).toFloat()' \
+            "$FILE"
+
+          grep -Fq \
+            '(baseTop + i.toFloat() * spacing).toInt()' \
+            "$FILE"
+
+          echo "Kotlin carousel type checks passed."
+
+      - name: Run project smoke tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
           python3 smoke_test.py
 
       - name: Build debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          set -o pipefail
+          set -uo pipefail
+
+          set +e
 
           gradle clean assembleDebug \
             --no-daemon \
             --stacktrace \
             --info \
             2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+
+          STATUS=${PIPESTATUS[0]}
+
+          set -e
+
+          echo "Gradle exit code: $STATUS"
+
+          if [ "$STATUS" -ne 0 ]; then
+            echo ""
+            echo "========== COMPILATION ERRORS =========="
+
+            grep -n -E \
+              '(^|[[:space:]])e: |Unresolved reference|Argument type mismatch|Type mismatch|None of the following candidates|Compilation error|FAILURE:|What went wrong:' \
+              "$GITHUB_WORKSPACE/build.log" \
+              | tail -n 100 || true
+
+            echo ""
+            echo "========== LAST BUILD LOG LINES =========="
+
+            tail -n 200 "$GITHUB_WORKSPACE/build.log" || true
+          fi
+
+          exit "$STATUS"
+
+      - name: Verify APK
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+
+          if [ ! -s "$APK" ]; then
+            echo "::error::APK was not generated."
+            exit 1
+          fi
+
+          mkdir -p "$GITHUB_WORKSPACE/release"
+
+          cp "$APK" \
+            "$GITHUB_WORKSPACE/release/GolNegar-v1.4.5-debug.apk"
+
+          echo "APK generated successfully:"
+          ls -lh \
+            "$GITHUB_WORKSPACE/release/GolNegar-v1.4.5-debug.apk"
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GolNegar-v1.4.5-debug
+          path: release/GolNegar-v1.4.5-debug.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload build log
         if: always()
@@ -106,30 +190,4 @@ jobs:
           name: GolNegar-v1.4.5-build-log
           path: build.log
           if-no-files-found: warn
-
-      - name: Prepare APK
-        if: success()
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          APK_SOURCE="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
-
-          if [ ! -f "$APK_SOURCE" ]; then
-            echo "ERROR: APK was not generated."
-            exit 1
-          fi
-
-          mkdir -p release
-
-          cp "$APK_SOURCE" release/GolNegar-v1.4.5-debug.apk
-
-          ls -lh release/GolNegar-v1.4.5-debug.apk
-
-      - name: Upload APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: GolNegar-v1.4.5-debug.apk
-          path: release/GolNegar-v1.4.5-debug.apk
-          if-no-files-found: error
+          retention-days: 14
