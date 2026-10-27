@@ -1,84 +1,125 @@
-name: Build Gol Negar APK
+name: Build HisabYar Pro Offline v1.7.3
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [main, master]
 permissions:
   contents: read
 jobs:
   build:
-    name: Build and Verify Gol Negar
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Setup Java 17
+
+      - name: Prepare project source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f app/build.gradle ]]; then
+            ZIP_FILE="./HisabYar_Pro_Offline_v1.7.3_BankImport.zip"
+            if [[ ! -s "$ZIP_FILE" ]]; then
+              ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.7.3*BankImport*.zip' -print -quit)"
+            fi
+            if [[ ! -s "$ZIP_FILE" ]]; then
+              echo "::error::Source ZIP missing from repository root."
+              find . -maxdepth 1 -type f -iname '*.zip' -print | sort || true
+              exit 1
+            fi
+            rm -rf /tmp/hisabyar-source && mkdir -p /tmp/hisabyar-source
+            unzip -q "$ZIP_FILE" -d /tmp/hisabyar-source
+            PROJECT_ROOT="$(find /tmp/hisabyar-source -type f -path '*/app/build.gradle' -print -quit | sed 's#/app/build.gradle$##')"
+            if [[ -z "$PROJECT_ROOT" ]]; then echo "::error::ZIP has no app/build.gradle"; exit 1; fi
+            cp -a "$PROJECT_ROOT"/. .
+          fi
+          test -s app/src/main/java/com/example/hisabyar/MainActivity.java
+          test -s app/src/main/AndroidManifest.xml
+          echo "Project source prepared."
+
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Setup Gradle
+
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Extract exact source ZIP
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+
+      - name: Install SDK packages
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Download and bundle Persian offline speech model
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="GolNegar_v1.8.42_Source_Final.zip"
-          test -s "$ZIP_FILE" || { echo "::error::Missing $ZIP_FILE in repository root"; find . -maxdepth 2 -type f -iname '*.zip' -print; exit 1; }
-          mkdir -p "$GITHUB_WORKSPACE/build_source"
-          unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/build_source"
-          SETTINGS_FILE="$(find "$GITHUB_WORKSPACE/build_source" -type f -name settings.gradle.kts -print -quit)"
-          test -n "$SETTINGS_FILE"
-          echo "PROJECT_DIR=$(dirname "$SETTINGS_FILE")" >> "$GITHUB_ENV"
-      - name: Validate source and run smoke tests
-        working-directory: ${{ env.PROJECT_DIR }}
+          mkdir -p app/src/main/assets
+          curl --fail --location --retry 3 --retry-delay 2 'https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip' -o /tmp/vosk-fa.zip
+          mkdir -p /tmp/vosk-fa
+          unzip -q /tmp/vosk-fa.zip -d /tmp/vosk-fa
+          MODEL_DIR="$(find /tmp/vosk-fa -type f -path '*/am/final.mdl' -print -quit | sed 's#/am/final.mdl$##')"
+          if [[ -z "$MODEL_DIR" ]]; then echo "::error::Vosk am/final.mdl not found"; exit 1; fi
+          mkdir -p "$MODEL_DIR/conf"
+          [[ -s "$MODEL_DIR/conf/model.conf" ]] || printf '%s\n' '--beam=13.0' '--lattice-beam=6.0' > "$MODEL_DIR/conf/model.conf"
+          [[ -s "$MODEL_DIR/uuid" ]] || printf '%s\n' 'hisabyar-vosk-fa-0.42-v1.7.0' > "$MODEL_DIR/uuid"
+          test -s "$MODEL_DIR/am/final.mdl"
+          rm -rf app/src/main/assets/model-fa
+          cp -a "$MODEL_DIR" app/src/main/assets/model-fa
+          test -s app/src/main/assets/model-fa/uuid
+          test -s app/src/main/assets/model-fa/conf/model.conf
+          echo "Vosk model bundled: $(du -sh app/src/main/assets/model-fa | cut -f1)"
+
+      - name: Validate source, models, and offline policy
         shell: bash
         run: |
           set -euo pipefail
-          test -s settings.gradle.kts
-          test -s build.gradle.kts
-          test -s app/build.gradle.kts
-          test -s app/google-services.json
-          test -s app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'versionName = "1.8.42"' app/build.gradle.kts
-          grep -q 'versionCode = 144' app/build.gradle.kts
-          python3 smoke_test.py
-      - name: Build debug APK and capture log
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        run: |
-          set -uo pipefail
-          gradle clean assembleDebug --no-daemon --stacktrace --info 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
-          STATUS=${PIPESTATUS[0]}
-          if [ "$STATUS" -ne 0 ]; then
-            grep -n -E 'e: |Unresolved reference|Type mismatch|Compilation error|FAILURE:|What went wrong:' "$GITHUB_WORKSPACE/build.log" | tail -n 100 || true
-            tail -n 160 "$GITHUB_WORKSPACE/build.log" || true
+          check() {
+            local label="$1"; shift
+            if ! "$@"; then echo "::error::Validation failed: $label"; exit 1; fi
+            echo "PASS: $label"
+          }
+          check "versionName 1.7.3-Pro" grep -q "versionName '1.7.3-Pro'" app/build.gradle
+          check "versionCode 173" grep -qE 'versionCode[[:space:]]+173([[:space:]]|$)' app/build.gradle
+          check "JitPack repository" grep -qF 'jitpack.io' settings.gradle
+          check "Vosk UUID" test -s app/src/main/assets/model-fa/uuid
+          check "Vosk model config" test -s app/src/main/assets/model-fa/conf/model.conf
+          if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
+            echo "::error::Internet permission found in offline app manifest"; exit 1
           fi
-          exit "$STATUS"
-      - name: Stage APK
-        if: success()
+          echo "PASS: no Internet permission in manifest"
+          if grep -Eiq 'tesseract4android|TessBaseAPI|processChequeImage|REQ_CHEQUE_IMAGE' app/src/main/java/com/example/hisabyar/MainActivity.java app/build.gradle; then
+            echo "::error::OCR code/dependency unexpectedly present"; exit 1
+          fi
+          check "amount masking feature" grep -q 'hide_amounts' app/src/main/java/com/example/hisabyar/MainActivity.java
+          check "duplicate transaction warning" grep -q 'saveTransactionWithDuplicateWarning' app/src/main/java/com/example/hisabyar/MainActivity.java
+          check "PDF report action" grep -q 'printFinancialReport' app/src/main/java/com/example/hisabyar/MainActivity.java
+
+      - name: Build APK
+        run: gradle --no-daemon clean assembleDebug --stacktrace
+
+      - name: Verify models are embedded in APK
         shell: bash
         run: |
           set -euo pipefail
-          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$APK"
-          mkdir -p "$GITHUB_WORKSPACE/release"
-          cp "$APK" "$GITHUB_WORKSPACE/release/GolNegar-v1.8.42-debug.apk"
-      - name: Upload APK
-        if: success()
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK" || { echo "::error::APK not produced"; exit 1; }
+          for asset in assets/model-fa/uuid assets/model-fa/conf/model.conf; do
+            unzip -l "$APK" | grep -F "$asset" >/dev/null || { echo "::error::APK missing $asset"; exit 1; }
+            echo "PASS: APK contains $asset"
+          done
+          echo "APK size: $(du -h "$APK" | cut -f1)"
+
+      - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.8.42-debug
-          path: release/GolNegar-v1.8.42-debug.apk
+          name: HisabYar-Pro-Offline-v1.7.3-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-          retention-days: 14
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: GolNegar-v1.8.42-build-log
-          path: build.log
-          if-no-files-found: warn
-          retention-days: 14
+          retention-days: 30
